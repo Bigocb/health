@@ -107,8 +107,6 @@ func (c *Client) queryNodeMetrics(ctx context.Context, m *Metrics) error {
 	m.Nodes.Total = int(floatValue(results["total_nodes"]))
 	m.Nodes.NotReady = m.Nodes.Total - m.Nodes.Ready
 
-	fmt.Printf("[DEBUG] Node metrics: ready=%d, total=%d, not_ready=%d\n", m.Nodes.Ready, m.Nodes.Total, m.Nodes.NotReady)
-
 	return nil
 }
 
@@ -131,8 +129,6 @@ func (c *Client) queryPodMetrics(ctx context.Context, m *Metrics) error {
 	m.Pods.Pending = 0 // Not separately tracked in shell script
 	m.Pods.Failed = int(floatValue(results["unhealthy_pods"]))
 	m.Pods.Restarts = int(floatValue(results["restarts_1h"]))
-
-	fmt.Printf("[DEBUG] Pod metrics: running=%d, total=%d, unhealthy=%d, restarts=%d\n", m.Pods.Running, m.Pods.Total, m.Pods.Failed, m.Pods.Restarts)
 
 	return nil
 }
@@ -161,8 +157,6 @@ func (c *Client) queryResourceMetrics(ctx context.Context, m *Metrics) error {
 	m.Resources.MemoryUsagePercent = floatValue(results["mem_usage"])
 	m.Resources.DiskUsagePercent = floatValue(results["disk_usage"])
 	m.Resources.AvailableMemoryGB = floatValue(results["mem_available"])
-
-	fmt.Printf("[DEBUG] Resource metrics: cpu=%.2f%%, mem=%.2f%%, disk=%.2f%%, mem_available=%.2f GB\n", m.Resources.CPUUsagePercent, m.Resources.MemoryUsagePercent, m.Resources.DiskUsagePercent, m.Resources.AvailableMemoryGB)
 
 	return nil
 }
