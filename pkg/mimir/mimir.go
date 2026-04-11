@@ -115,11 +115,10 @@ func (c *Client) queryNodeMetrics(ctx context.Context, m *Metrics) error {
 // queryPodMetrics queries pod status from Mimir
 func (c *Client) queryPodMetrics(ctx context.Context, m *Metrics) error {
 	queries := map[string]string{
-		"running_pods": `count(kube_pod_status_phase{phase="Running"})`,
-		"total_pods":   `count(kube_pod_info)`,
-		"pending_pods": `count(kube_pod_status_phase{phase="Pending"})`,
-		"failed_pods":  `count(kube_pod_status_phase{phase="Failed"})`,
-		"restarts_1h":  `sum(increase(kube_pod_container_status_restarts_total[1h]))`,
+		"running_pods":   `count(kube_pod_status_phase{phase="Running"})`,
+		"total_pods":     `count(kube_pod_info)`,
+		"unhealthy_pods": `count(kube_pod_status_phase{phase!~"Running|Succeeded"} == 1)`,
+		"restarts_1h":    `sum(increase(kube_pod_container_status_restarts_total[1h]))`,
 	}
 
 	results, err := c.queryRange(ctx, queries)
@@ -129,11 +128,11 @@ func (c *Client) queryPodMetrics(ctx context.Context, m *Metrics) error {
 
 	m.Pods.Running = int(floatValue(results["running_pods"]))
 	m.Pods.Total = int(floatValue(results["total_pods"]))
-	m.Pods.Pending = int(floatValue(results["pending_pods"]))
-	m.Pods.Failed = int(floatValue(results["failed_pods"]))
+	m.Pods.Pending = 0 // Not separately tracked in shell script
+	m.Pods.Failed = int(floatValue(results["unhealthy_pods"]))
 	m.Pods.Restarts = int(floatValue(results["restarts_1h"]))
 
-	fmt.Printf("[DEBUG] Pod metrics: running=%d, total=%d, pending=%d, failed=%d, restarts=%d\n", m.Pods.Running, m.Pods.Total, m.Pods.Pending, m.Pods.Failed, m.Pods.Restarts)
+	fmt.Printf("[DEBUG] Pod metrics: running=%d, total=%d, unhealthy=%d, restarts=%d\n", m.Pods.Running, m.Pods.Total, m.Pods.Failed, m.Pods.Restarts)
 
 	return nil
 }
