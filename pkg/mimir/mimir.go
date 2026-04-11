@@ -133,6 +133,8 @@ func (c *Client) queryPodMetrics(ctx context.Context, m *Metrics) error {
 	m.Pods.Failed = int(floatValue(results["failed_pods"]))
 	m.Pods.Restarts = int(floatValue(results["restarts_1h"]))
 
+	fmt.Printf("[DEBUG] Pod metrics: running=%d, total=%d, pending=%d, failed=%d, restarts=%d\n", m.Pods.Running, m.Pods.Total, m.Pods.Pending, m.Pods.Failed, m.Pods.Restarts)
+
 	return nil
 }
 
