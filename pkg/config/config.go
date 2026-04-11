@@ -42,6 +42,11 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
+	// Fill in Discord webhook URL from env var if not in config
+	if cfg.Discord.WebhookURL == "" {
+		cfg.Discord.WebhookURL = os.Getenv("DISCORD_WEBHOOK_URL")
+	}
+
 	return &cfg, nil
 }
 
