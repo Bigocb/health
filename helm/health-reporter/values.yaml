@@ -5,7 +5,7 @@ namespace: monitoring
 
 # Docker image configuration
 image:
-  repository: ghcr.io/Bigocb/health
+  repository: ghcr.io/bigocb/health
   tag: latest
   pullPolicy: IfNotPresent
 
