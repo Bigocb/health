@@ -94,9 +94,9 @@ func (c *Client) GetMetrics(ctx context.Context) (*Metrics, error) {
 func (c *Client) queryNodeMetrics(ctx context.Context, m *Metrics) error {
 	// Query: node status (ready, not ready)
 	queries := map[string]string{
-		"ready_nodes":     `count(kube_node_status_condition{condition="Ready",status="true"})`,
-		"total_nodes":     `count(kube_node_labels)`,
-		"not_ready_nodes": `count(kube_node_status_condition{condition="Ready",status="false"})`,
+		"ready_nodes":     `sum(kube_node_status_condition{condition="Ready",status="true"} unless on(node) kube_node_spec_unschedulable == 1)`,
+		"total_nodes":     `count(kube_node_info unless on(node) kube_node_spec_unschedulable == 1)`,
+		"not_ready_nodes": `count(kube_node_status_condition{condition="Ready",status="false"} unless on(node) kube_node_spec_unschedulable == 1)`,
 	}
 
 	results, err := c.queryRange(ctx, queries)
@@ -138,9 +138,10 @@ func (c *Client) queryPodMetrics(ctx context.Context, m *Metrics) error {
 // queryResourceMetrics queries resource usage from Mimir
 func (c *Client) queryResourceMetrics(ctx context.Context, m *Metrics) error {
 	queries := map[string]string{
-		"cpu_usage":     `sum(rate(container_cpu_usage_seconds_total[5m])) / sum(machine_cpu_cores) * 100`,
-		"mem_usage":     `sum(container_memory_usage_bytes) / sum(machine_memory_bytes) * 100`,
-		"mem_available": `sum(machine_memory_bytes - container_memory_usage_bytes) / 1024 / 1024 / 1024`,
+		"cpu_usage":     `round(100*(1-avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))),0.01)`,
+		"mem_usage":     `round(100*(1-sum(node_memory_MemAvailable_bytes)/sum(node_memory_MemTotal_bytes)),0.01)`,
+		"disk_usage":    `round(100*(1-sum(node_filesystem_avail_bytes{mountpoint="/"})/sum(node_filesystem_size_bytes{mountpoint="/"})),0.01)`,
+		"mem_available": `round(sum(node_memory_MemAvailable_bytes)/1024/1024/1024,0.01)`,
 	}
 
 	results, err := c.queryRange(ctx, queries)
@@ -148,14 +149,15 @@ func (c *Client) queryResourceMetrics(ctx context.Context, m *Metrics) error {
 		// Return partial results if some queries fail
 		m.Resources.CPUUsagePercent = floatValue(results["cpu_usage"])
 		m.Resources.MemoryUsagePercent = floatValue(results["mem_usage"])
+		m.Resources.DiskUsagePercent = floatValue(results["disk_usage"])
 		m.Resources.AvailableMemoryGB = floatValue(results["mem_available"])
 		return nil
 	}
 
 	m.Resources.CPUUsagePercent = floatValue(results["cpu_usage"])
 	m.Resources.MemoryUsagePercent = floatValue(results["mem_usage"])
+	m.Resources.DiskUsagePercent = floatValue(results["disk_usage"])
 	m.Resources.AvailableMemoryGB = floatValue(results["mem_available"])
-	m.Resources.DiskUsagePercent = 0 // TODO: Query disk metrics if available
 
 	return nil
 }
@@ -218,13 +220,6 @@ func (c *Client) query(ctx context.Context, promql string) (float64, error) {
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return 0, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	// Log query and result for debugging
-	fmt.Printf("[query] %s\n", promql)
-	fmt.Printf("[result] %d values returned\n", len(result.Data.Result))
-	if len(result.Data.Result) > 0 {
-		fmt.Printf("[value] %v\n", result.Data.Result[0].Value[1])
 	}
 
 	if len(result.Data.Result) == 0 {
