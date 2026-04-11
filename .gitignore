@@ -1,0 +1,41 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Build output
+/health-reporter
+/bin/
+/dist/
+
+# Go
+*.o
+*.a
+*.out
+*.mod.tidy
+vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Config
+config.yaml
+config.yaml.local
+*.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# Temp
+tmp/
+temp/

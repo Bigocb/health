@@ -1,0 +1,15 @@
+# Health Reporter Configuration
+
+mimir:
+  url: "http://mimir-query:9009"
+  username: ""
+  password: ""
+
+discord:
+  webhook_url: "${DISCORD_WEBHOOK_URL}"
+
+health:
+  cpu_threshold: 80
+  memory_threshold: 85
+  disk_threshold: 90
+  restart_limit: 5
