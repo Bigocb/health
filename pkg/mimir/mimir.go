@@ -169,12 +169,6 @@ func (c *Client) queryResourceMetrics(ctx context.Context, m *Metrics) error {
 
 // queryRange executes multiple PromQL queries and returns results
 func (c *Client) queryRange(ctx context.Context, queries map[string]string) (map[string]float64, error) {
-
-	return nil
-}
-
-// queryRange executes multiple PromQL queries and returns results
-func (c *Client) queryRange(ctx context.Context, queries map[string]string) (map[string]float64, error) {
 	results := make(map[string]float64)
 
 	for key, query := range queries {
