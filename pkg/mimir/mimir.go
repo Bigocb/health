@@ -94,9 +94,8 @@ func (c *Client) GetMetrics(ctx context.Context) (*Metrics, error) {
 func (c *Client) queryNodeMetrics(ctx context.Context, m *Metrics) error {
 	// Query: node status (ready, not ready)
 	queries := map[string]string{
-		"ready_nodes":     `sum(kube_node_status_condition{condition="Ready",status="true"} unless on(node) kube_node_spec_unschedulable == 1)`,
-		"total_nodes":     `count(kube_node_info unless on(node) kube_node_spec_unschedulable == 1)`,
-		"not_ready_nodes": `count(kube_node_status_condition{condition="Ready",status="false"} unless on(node) kube_node_spec_unschedulable == 1)`,
+		"ready_nodes": `sum(kube_node_status_condition{condition="Ready",status="true"} unless on(node) kube_node_spec_unschedulable == 1)`,
+		"total_nodes": `count(kube_node_info unless on(node) kube_node_spec_unschedulable == 1)`,
 	}
 
 	results, err := c.queryRange(ctx, queries)
@@ -106,7 +105,7 @@ func (c *Client) queryNodeMetrics(ctx context.Context, m *Metrics) error {
 
 	m.Nodes.Ready = int(floatValue(results["ready_nodes"]))
 	m.Nodes.Total = int(floatValue(results["total_nodes"]))
-	m.Nodes.NotReady = int(floatValue(results["not_ready_nodes"]))
+	m.Nodes.NotReady = m.Nodes.Total - m.Nodes.Ready
 
 	fmt.Printf("[DEBUG] Node metrics: ready=%d, total=%d, not_ready=%d\n", m.Nodes.Ready, m.Nodes.Total, m.Nodes.NotReady)
 
