@@ -217,7 +217,14 @@ func (c *Client) query(ctx context.Context, promql string) (float64, error) {
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return 0, fmt.Errorf("failed to parse response: %w", err)
+		return 0, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	// Log query and result for debugging
+	fmt.Printf("[query] %s\n", promql)
+	fmt.Printf("[result] %d values returned\n", len(result.Data.Result))
+	if len(result.Data.Result) > 0 {
+		fmt.Printf("[value] %v\n", result.Data.Result[0].Value[1])
 	}
 
 	if len(result.Data.Result) == 0 {
