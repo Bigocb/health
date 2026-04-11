@@ -108,6 +108,8 @@ func (c *Client) queryNodeMetrics(ctx context.Context, m *Metrics) error {
 	m.Nodes.Total = int(floatValue(results["total_nodes"]))
 	m.Nodes.NotReady = int(floatValue(results["not_ready_nodes"]))
 
+	fmt.Printf("[DEBUG] Node metrics: ready=%d, total=%d, not_ready=%d\n", m.Nodes.Ready, m.Nodes.Total, m.Nodes.NotReady)
+
 	return nil
 }
 
@@ -138,11 +140,32 @@ func (c *Client) queryPodMetrics(ctx context.Context, m *Metrics) error {
 // queryResourceMetrics queries resource usage from Mimir
 func (c *Client) queryResourceMetrics(ctx context.Context, m *Metrics) error {
 	queries := map[string]string{
-		"cpu_usage":     `round(100*(1-avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))),0.01)`,
-		"mem_usage":     `round(100*(1-sum(node_memory_MemAvailable_bytes)/sum(node_memory_MemTotal_bytes)),0.01)`,
-		"disk_usage":    `round(100*(1-sum(node_filesystem_avail_bytes{mountpoint="/"})/sum(node_filesystem_size_bytes{mountpoint="/"})),0.01)`,
-		"mem_available": `round(sum(node_memory_MemAvailable_bytes)/1024/1024/1024,0.01)`,
+		"cpu_usage":    `round(100*(1-avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))),1)`,
+		"mem_usage":    `round(100*(1-sum(node_memory_MemAvailable_bytes)/sum(node_memory_MemTotal_bytes)),1)`,
+		"disk_usage":   `round(100*(1-sum(node_filesystem_avail_bytes{mountpoint="/"})/sum(node_filesystem_size_bytes{mountpoint="/"})),1)`,
+		"mem_available": `round(sum(node_memory_MemAvailable_bytes)/1024/1024/1024,1)`,
 	}
+
+	results, err := c.queryRange(ctx, queries)
+	if err != nil {
+		// Return partial results if some queries fail
+		m.Resources.CPUUsagePercent = floatValue(results["cpu_usage"])
+		m.Resources.MemoryUsagePercent = floatValue(results["mem_usage"])
+		m.Resources.DiskUsagePercent = floatValue(results["disk_usage"])
+		m.Resources.AvailableMemoryGB = floatValue(results["mem_available"])
+		fmt.Printf("[DEBUG] Resource metrics (partial): cpu=%.2f%%, mem=%.2f%%, disk=%.2f%%\n", m.Resources.CPUUsagePercent, m.Resources.MemoryUsagePercent, m.Resources.DiskUsagePercent)
+		return nil
+	}
+
+	m.Resources.CPUUsagePercent = floatValue(results["cpu_usage"])
+	m.Resources.MemoryUsagePercent = floatValue(results["mem_usage"])
+	m.Resources.DiskUsagePercent = floatValue(results["disk_usage"])
+	m.Resources.AvailableMemoryGB = floatValue(results["mem_available"])
+
+	fmt.Printf("[DEBUG] Resource metrics: cpu=%.2f%%, mem=%.2f%%, disk=%.2f%%, mem_available=%.2f GB\n", m.Resources.CPUUsagePercent, m.Resources.MemoryUsagePercent, m.Resources.DiskUsagePercent, m.Resources.AvailableMemoryGB)
+
+	return nil
+}
 
 	results, err := c.queryRange(ctx, queries)
 	if err != nil {
@@ -189,6 +212,8 @@ func (c *Client) query(ctx context.Context, promql string) (float64, error) {
 
 	q := u.Query()
 	q.Set("query", promql)
+	// Query at now-5min to stay within Mimir staleness window (scrape data lags ~5min)
+	q.Set("time", fmt.Sprintf("%d", time.Now().Unix()-300))
 	u.RawQuery = q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
