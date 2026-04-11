@@ -7,7 +7,7 @@ namespace: monitoring
 image:
   repository: ghcr.io/bigocb/health
   tag: latest
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 # Mimir configuration
 mimir:
