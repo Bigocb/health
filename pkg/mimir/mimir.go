@@ -113,7 +113,7 @@ func (c *Client) queryNodeMetrics(ctx context.Context, m *Metrics) error {
 // queryPodMetrics queries pod status from Mimir
 func (c *Client) queryPodMetrics(ctx context.Context, m *Metrics) error {
 	queries := map[string]string{
-		"running_pods":   `count(kube_pod_status_phase{phase="Running"})`,
+		"running_pods":   `count(kube_pod_status_phase{phase="Running"} == 1)`,
 		"total_pods":     `count(kube_pod_info)`,
 		"unhealthy_pods": `count(kube_pod_status_phase{phase!~"Running|Succeeded"} == 1)`,
 		"restarts_1h":    `sum(increase(kube_pod_container_status_restarts_total[1h]))`,
