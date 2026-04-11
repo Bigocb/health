@@ -130,8 +130,6 @@ func (c *Client) queryPodMetrics(ctx context.Context, m *Metrics) error {
 	m.Pods.Failed = int(floatValue(results["unhealthy_pods"]))
 	m.Pods.Restarts = int(floatValue(results["restarts_1h"]))
 
-	fmt.Printf("[DEBUG] Pod metrics: running=%d, total=%d, unhealthy=%d, restarts=%d\n", m.Pods.Running, m.Pods.Total, m.Pods.Failed, m.Pods.Restarts)
-
 	return nil
 }
 
@@ -175,7 +173,6 @@ func (c *Client) queryRange(ctx context.Context, queries map[string]string) (map
 			results[key] = 0
 			continue
 		}
-		fmt.Printf("[DEBUG] query %s returned: %v\n", key, val)
 		results[key] = val
 	}
 
