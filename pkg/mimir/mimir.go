@@ -180,7 +180,7 @@ func (c *Client) queryRange(ctx context.Context, queries map[string]string) (map
 
 // query executes a single PromQL query
 func (c *Client) query(ctx context.Context, promql string) (float64, error) {
-	u, err := url.Parse(c.baseURL + "/api/prom/query")
+	u, err := url.Parse(c.baseURL + "/api/v1/query")
 	if err != nil {
 		return 0, err
 	}
