@@ -1,0 +1,171 @@
+---
+# Source: health-reporter/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: health-reporter
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    chart: health-reporter-0.1.0
+    release: health-reporter
+    heritage: Helm
+automountServiceAccountToken: true
+---
+# Source: health-reporter/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: health-reporter-config
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    chart: health-reporter-0.1.0
+    release: health-reporter
+    heritage: Helm
+data:
+  config.yaml: |
+    mimir:
+      url: "http://mimir-query:9009"
+    
+    discord:
+      webhook_url: "${DISCORD_WEBHOOK_URL}"
+    
+    health:
+      cpu_threshold: 80
+      memory_threshold: 85
+      disk_threshold: 90
+      restart_limit: 5
+---
+# Source: health-reporter/templates/clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: health-reporter
+  labels:
+    app: health-reporter
+    chart: health-reporter-0.1.0
+    release: health-reporter
+    heritage: Helm
+rules:
+# Read nodes
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+
+# Read pods
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+
+# Read pod logs (for debugging)
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get"]
+
+# Read events
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get", "list", "watch"]
+
+# Read namespaces (for cluster info)
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list"]
+
+# Read persistent volumes (future: disk monitoring)
+- apiGroups: [""]
+  resources: ["persistentvolumes", "persistentvolumeclaims"]
+  verbs: ["get", "list"]
+
+# Read metrics (if needed)
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["nodes", "pods"]
+  verbs: ["get", "list"]
+---
+# Source: health-reporter/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: health-reporter
+  labels:
+    app: health-reporter
+    chart: health-reporter-0.1.0
+    release: health-reporter
+    heritage: Helm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: health-reporter
+subjects:
+- kind: ServiceAccount
+  name: health-reporter
+  namespace: monitoring
+---
+# Source: health-reporter/templates/cronjob.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: health-reporter
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    chart: health-reporter-0.1.0
+    release: health-reporter
+    heritage: Helm
+spec:
+  # Hourly schedule (top of each hour)
+  schedule: "0 * * * *"
+  startingDeadlineSeconds: 60
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: health-reporter
+            release: health-reporter
+          annotations:
+            checksum/config: 0148099db05c5415e38853972589ce7dafa7ce3d16b58203f6a6810bf6619aee
+        
+        spec:
+          serviceAccountName: health-reporter
+          restartPolicy: OnFailure
+          
+          containers:
+          - name: health-reporter
+            image: "95.217.74.248:32000/health-reporter:v0.1.0"
+            imagePullPolicy: IfNotPresent
+            
+            args:
+              - "--config"
+              - "/etc/health-reporter/config.yaml"
+              - "--once"
+            
+            env:
+            - name: DISCORD_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: health-report-webhook
+                  key: webhook-url
+            
+            resources:
+              limits:
+                cpu: 500m
+                memory: 256Mi
+              requests:
+                cpu: 50m
+                memory: 64Mi
+            
+            volumeMounts:
+            - name: config
+              mountPath: /etc/health-reporter
+              readOnly: true
+          
+          volumes:
+          - name: config
+            configMap:
+              name: health-reporter-config

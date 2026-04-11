@@ -1,0 +1,100 @@
+# Health Reporter Helm Chart Values
+
+# Global namespace
+namespace: monitoring
+
+# Docker image configuration
+image:
+  repository: ghcr.io/Bigocb/health
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Mimir configuration
+mimir:
+  url: "http://mimir-nginx.monitoring.svc.cluster.local:80/prometheus"
+  username: ""
+  password: ""
+
+# Discord webhook configuration
+discord:
+  # Discord webhook URL - set via helm install -set discord.webhookUrl="https://..."
+  # or via --values with secret reference
+  webhookUrl: ""
+  webhookSecret: "health-report-webhook"  # Name of secret storing webhook URL (existing secret in cluster)
+
+# Health thresholds
+health:
+  cpuThreshold: 80
+  memoryThreshold: 85
+  diskThreshold: 90
+  restartLimit: 5
+
+# Deployment configuration
+deployment:
+  replicas: 1
+  strategy:
+    type: Recreate  # CronJob needs Recreate, not RollingUpdate
+  
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+  
+  # Pod disruption budget
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 0
+
+# Scheduling
+scheduling:
+  # Run hourly at top of hour
+  schedule: "0 * * * *"
+  
+  # Time to wait for job to complete
+  startingDeadlineSeconds: 60
+  
+  # Concurrency policy
+  concurrencyPolicy: Forbid
+  
+  # Successful jobs to keep
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+
+# CronJob or Deployment mode
+mode: "cron"  # Can be "cron" or "deployment" (for testing)
+
+# Service Account
+serviceAccount:
+  create: true
+  name: health-reporter
+  automountServiceAccountToken: true
+
+# RBAC
+rbac:
+  create: true
+
+# Node selection
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Pod affinity
+affinity: {}
+
+# Environment variables
+env: {}
+  # Additional environment variables can be set here
+
+# Logging
+logging:
+  verbose: false
+
+# Volume mounts (for future use)
+volumeMounts: []
+
+# Volumes (for future use)
+volumes: []

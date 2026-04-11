@@ -194,6 +194,9 @@ func (c *Client) query(ctx context.Context, promql string) (float64, error) {
 		return 0, err
 	}
 
+	// Add Mimir tenant header
+	req.Header.Set("X-Scope-OrgID", "admin")
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return 0, fmt.Errorf("query failed: %w", err)

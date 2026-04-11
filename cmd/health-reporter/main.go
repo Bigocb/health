@@ -24,8 +24,8 @@ func main() {
 		runOnce     = flag.Bool("once", false, "Run report once and exit (no daemon mode)")
 		interval    = flag.Duration("interval", 1*time.Hour, "Interval between reports (daemon mode)")
 		showVersion = flag.Bool("version", false, "Show version and exit")
-		mimiURL     = flag.String("mimir-url", "http://mimir-query:9009", "Mimir query endpoint")
-		discordURL  = flag.String("discord-webhook", "", "Discord webhook URL")
+		mimirURL    = flag.String("mimir-url", "", "Mimir query endpoint (overrides config)")
+		discordURL  = flag.String("discord-webhook", "", "Discord webhook URL (overrides config)")
 		verbose     = flag.Bool("verbose", false, "Enable verbose logging")
 	)
 	flag.Parse()
@@ -49,9 +49,9 @@ func main() {
 		cfg = config.DefaultConfig()
 	}
 
-	// Override config with CLI flags
-	if *mimiURL != "" {
-		cfg.Mimir.URL = *mimiURL
+	// Override config with CLI flags (only if explicitly provided)
+	if *mimirURL != "" {
+		cfg.Mimir.URL = *mimirURL
 	}
 	if *discordURL != "" {
 		cfg.Discord.WebhookURL = *discordURL

@@ -1,0 +1,17 @@
+apiVersion: v2
+name: health-reporter
+description: Kubernetes cluster health monitoring with Discord integration
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - monitoring
+  - health
+  - kubernetes
+  - discord
+maintainers:
+  - name: ArchipelagoAI
+    email: dev@archipelago.ai
+home: https://github.com/ArchipelagoAI/health-reporter
+sources:
+  - https://github.com/ArchipelagoAI/health-reporter
