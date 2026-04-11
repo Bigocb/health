@@ -81,8 +81,8 @@ func (r *Reporter) SendReport(ctx context.Context, report *types.Report) error {
 
 // calculateStatus determines overall cluster health
 func (r *Reporter) calculateStatus(metrics *mimir.Metrics) types.HealthStatus {
-	// Critical: any failed pods, node down, or high resource usage
-	if metrics.Pods.Failed > 0 || metrics.Nodes.NotReady > 0 {
+	// Critical: multiple failed pods, node down, or high resource usage
+	if metrics.Pods.Failed > 10 || metrics.Nodes.NotReady > 0 {
 		return types.StatusCritical
 	}
 
@@ -90,8 +90,8 @@ func (r *Reporter) calculateStatus(metrics *mimir.Metrics) types.HealthStatus {
 		return types.StatusCritical
 	}
 
-	// Degraded: restarts, pending pods, or elevated resource usage
-	if metrics.Pods.Restarts > 5 || metrics.Pods.Pending > 2 {
+	// Degraded: some failed pods, restarts, or elevated resource usage
+	if metrics.Pods.Failed > 0 || metrics.Pods.Restarts > 5 {
 		return types.StatusDegraded
 	}
 
