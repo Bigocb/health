@@ -11,7 +11,7 @@ image:
 
 # Mimir configuration
 mimir:
-  url: "http://mimir-nginx.monitoring.svc.cluster.local:80/prometheus"
+  url: "http://mimir-nginx.monitoring.svc.cluster.local:80"
   username: ""
   password: ""
 
