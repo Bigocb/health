@@ -385,7 +385,7 @@ func (c *Client) queryServiceMetrics(ctx context.Context, m *Metrics) error {
 	queries := map[string]string{
 		"total_services": `count(kube_service_labels)`,
 		"cluster_ip":     `count(kube_service_spec_type{type="ClusterIP"})`,
-		"headless":       `count(kube_service_spec_type{type="ClusterIP"} and kube_service_spec_cluster_ip == "")`,
+		"headless":       `count(kube_service_spec_type{type="ClusterIP"} unless kube_service_spec_cluster_ip)`,
 		"loadbalancer":   `count(kube_service_spec_type{type="LoadBalancer"})`,
 	}
 
