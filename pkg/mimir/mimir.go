@@ -207,17 +207,19 @@ func (c *Client) queryNodeDetailsMetrics(ctx context.Context, m *Metrics) error 
 		}
 
 		// Query per-node metrics
-		cpuQuery := fmt.Sprintf(`round(100*(1-avg(rate(node_cpu_seconds_total{node="%s",mode="idle"}[5m]))),1)`, node)
+		// Note: node_exporter metrics use 'instance' label (hostname:port), not 'node' label
+		// We query by instance and match against node name (instance label may be hostname or hostname:port)
+		cpuQuery := fmt.Sprintf(`round(100*(1-avg(rate(node_cpu_seconds_total{instance=~"%s.*",mode="idle"}[5m]))),1)`, node)
 		if cpu, err := c.query(ctx, cpuQuery); err == nil && cpu >= 0 {
 			detail.CPUUsagePercent = cpu
 		}
 
-		memQuery := fmt.Sprintf(`round(100*(1-node_memory_MemAvailable_bytes{node="%s"}/node_memory_MemTotal_bytes{node="%s"}),1)`, node, node)
+		memQuery := fmt.Sprintf(`round(100*(1-node_memory_MemAvailable_bytes{instance=~"%s.*"}/node_memory_MemTotal_bytes{instance=~"%s.*"}),1)`, node, node)
 		if mem, err := c.query(ctx, memQuery); err == nil && mem >= 0 {
 			detail.MemoryUsagePercent = mem
 		}
 
-		memAvailQuery := fmt.Sprintf(`round(node_memory_MemAvailable_bytes{node="%s"}/1024/1024/1024,1)`, node)
+		memAvailQuery := fmt.Sprintf(`round(node_memory_MemAvailable_bytes{instance=~"%s.*"}/1024/1024/1024,1)`, node)
 		if memAvail, err := c.query(ctx, memAvailQuery); err == nil && memAvail >= 0 {
 			detail.AvailableMemoryGB = memAvail
 		}
