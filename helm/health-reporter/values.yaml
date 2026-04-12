@@ -1,4 +1,5 @@
 # Health Reporter Helm Chart Values
+# Single deployment: runs CRD controller + periodic health reports in one process.
 
 # Global namespace
 namespace: monitoring
@@ -11,20 +12,11 @@ image:
 
 # CRD Configuration
 crd:
-  # Install CRD (only needed on first install)
   install: true
 
-# Controller Configuration
-controller:
-  enabled: true
-  replicas: 1
-  resources:
-    requests:
-      memory: "64Mi"
-      cpu: "50m"
-    limits:
-      memory: "256Mi"
-      cpu: "500m"
+# Reporting schedule (Go duration format)
+reporting:
+  interval: "1h"
 
 # Mimir configuration
 mimir:
@@ -34,10 +26,8 @@ mimir:
 
 # Discord webhook configuration
 discord:
-  # Discord webhook URL - set via helm install -set discord.webhookUrl="https://..."
-  # or via --values with secret reference
   webhookUrl: ""
-  webhookSecret: "health-report-webhook"  # Name of secret storing webhook URL (existing secret in cluster)
+  webhookSecret: "health-report-webhook"
 
 # Health thresholds
 health:
@@ -46,42 +36,14 @@ health:
   diskThreshold: 90
   restartLimit: 5
 
-# Deployment configuration
-deployment:
-  replicas: 1
-  strategy:
-    type: Recreate  # CronJob needs Recreate, not RollingUpdate
-  
-  resources:
-    requests:
-      memory: "64Mi"
-      cpu: "50m"
-    limits:
-      memory: "256Mi"
-      cpu: "500m"
-  
-  # Pod disruption budget
-  podDisruptionBudget:
-    enabled: false
-    minAvailable: 0
-
-# Scheduling
-scheduling:
-  # Run hourly at top of hour
-  schedule: "0 * * * *"
-  
-  # Time to wait for job to complete
-  startingDeadlineSeconds: 60
-  
-  # Concurrency policy
-  concurrencyPolicy: Forbid
-  
-  # Successful jobs to keep
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 3
-
-# CronJob or Deployment mode
-mode: "cron"  # Can be "cron" or "deployment" (for testing)
+# Resource limits for the single deployment
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "50m"
+  limits:
+    memory: "256Mi"
+    cpu: "500m"
 
 # Service Account
 serviceAccount:
@@ -104,15 +66,13 @@ affinity: {}
 
 # Environment variables
 env: {}
-  # Additional environment variables can be set here
 
 # Logging
 logging:
   verbose: false
 
 # Smoke Tests - Example sample tests to install
-smokeTests:
-  # Uncomment to enable sample tests
+smokeTests: []
   # - name: kubernetes-dns
   #   type: dns
   #   severity: high
@@ -127,9 +87,3 @@ smokeTests:
   #   severity: critical
   #   host: etcd.default
   #   port: 2379
-
-# Volume mounts (for future use)
-volumeMounts: []
-
-# Volumes (for future use)
-volumes: []

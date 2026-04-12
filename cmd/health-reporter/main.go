@@ -22,18 +22,17 @@ import (
 	"github.com/ArchipelagoAI/health-reporter/pkg/webhook"
 )
 
-const version = "0.1.0"
+const version = "0.2.0"
 
 func main() {
 	var (
-		configPath     = flag.String("config", "config.yaml", "Path to config file")
-		runOnce        = flag.Bool("once", false, "Run report once and exit (no daemon mode)")
-		interval       = flag.Duration("interval", 1*time.Hour, "Interval between reports (daemon mode)")
-		showVersion    = flag.Bool("version", false, "Show version and exit")
-		mimirURL       = flag.String("mimir-url", "", "Mimir query endpoint (overrides config)")
-		discordURL     = flag.String("discord-webhook", "", "Discord webhook URL (overrides config)")
-		verbose        = flag.Bool("verbose", false, "Enable verbose logging")
-		skipController = flag.Bool("skip-controller", false, "Skip running the Kubernetes controller")
+		configPath  = flag.String("config", "config.yaml", "Path to config file")
+		runOnce     = flag.Bool("once", false, "Run one report and exit (for local testing)")
+		interval    = flag.Duration("interval", 1*time.Hour, "Interval between reports")
+		showVersion = flag.Bool("version", false, "Show version and exit")
+		mimirURL    = flag.String("mimir-url", "", "Mimir query endpoint (overrides config)")
+		discordURL  = flag.String("discord-webhook", "", "Discord webhook URL (overrides config)")
+		verbose     = flag.Bool("verbose", false, "Enable verbose logging")
 	)
 	flag.Parse()
 
@@ -73,10 +72,11 @@ func main() {
 
 	webhookSender := webhook.NewDiscordSender(cfg.Discord.WebhookURL)
 
-	// Create shared test registry
+	// Create shared test registry — the single source of truth for smoke tests.
+	// The CRD controller populates it, and the reporter reads from it.
 	testRegistry := smoke_tests.NewTestRegistry()
 
-	// Create health reporter with test registry
+	// Create health reporter with shared registry
 	reporter := health.NewReporter(mimirClient, webhookSender)
 	reporter.SetTestRegistry(testRegistry)
 
@@ -84,37 +84,53 @@ func main() {
 	log.Printf("mimir: %s", cfg.Mimir.URL)
 	log.Printf("discord: %s", mask(cfg.Discord.WebhookURL))
 
-	// Setup controller context
+	// Setup root context with signal handling
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Start Kubernetes controller if not skipped
-	if !*skipController {
-		go func() {
-			if err := startController(ctx, testRegistry); err != nil {
-				log.Printf("controller error: %v", err)
-			}
-		}()
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-		// Give controller time to start and cache
-		time.Sleep(2 * time.Second)
+	// Start the CRD controller in background.
+	// The controller watches SmokeTest CRDs and keeps testRegistry in sync.
+	controllerReady := make(chan struct{})
+	go func() {
+		if err := startController(ctx, testRegistry, controllerReady); err != nil {
+			log.Fatalf("controller failed: %v", err)
+		}
+	}()
+
+	// Wait for controller cache to sync before generating reports.
+	// This ensures the test registry is populated from existing CRDs.
+	log.Println("waiting for controller cache sync...")
+	select {
+	case <-controllerReady:
+		log.Println("controller ready, test registry populated")
+	case <-time.After(30 * time.Second):
+		log.Println("warning: controller cache sync timed out after 30s, proceeding anyway")
+	case sig := <-sigChan:
+		log.Printf("received signal during startup: %v, shutting down", sig)
+		cancel()
+		os.Exit(0)
 	}
 
 	if *runOnce {
-		// Run once and exit
+		// Run one report and exit (useful for local testing / debugging)
 		if err := runReport(reporter); err != nil {
 			log.Printf("error: %v", err)
 			os.Exit(1)
 		}
+		cancel()
 		os.Exit(0)
 	}
 
-	// Daemon mode
-	runDaemon(ctx, reporter, *interval)
+	// Daemon mode: generate reports on interval
+	log.Printf("entering daemon mode (interval: %s)", *interval)
+	runDaemon(ctx, cancel, reporter, *interval, sigChan)
 }
 
 func runReport(reporter *health.Reporter) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	report, err := reporter.Generate(ctx)
@@ -130,14 +146,11 @@ func runReport(reporter *health.Reporter) error {
 	return nil
 }
 
-func runDaemon(ctx context.Context, reporter *health.Reporter, interval time.Duration) {
+func runDaemon(ctx context.Context, cancel context.CancelFunc, reporter *health.Reporter, interval time.Duration, sigChan <-chan os.Signal) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	// Initial report
+	// Run initial report immediately
 	if err := runReport(reporter); err != nil {
 		log.Printf("initial report failed: %v", err)
 	}
@@ -150,14 +163,20 @@ func runDaemon(ctx context.Context, reporter *health.Reporter, interval time.Dur
 			}
 
 		case sig := <-sigChan:
-			log.Printf("received signal: %v, shutting down", sig)
-			os.Exit(0)
+			log.Printf("received signal: %v, shutting down gracefully", sig)
+			cancel()
+			return
+
+		case <-ctx.Done():
+			log.Println("context cancelled, shutting down")
+			return
 		}
 	}
 }
 
-// startController initializes and starts the Kubernetes controller
-func startController(ctx context.Context, testRegistry smoke_tests.TestRegistry) error {
+// startController initializes and starts the Kubernetes CRD controller.
+// It signals readiness via the ready channel once the cache is synced.
+func startController(ctx context.Context, testRegistry smoke_tests.TestRegistry, ready chan<- struct{}) error {
 	// Register API types
 	if err := healthv1alpha1.AddToScheme(scheme.Scheme); err != nil {
 		return fmt.Errorf("failed to register SmokeTest type: %w", err)
@@ -179,6 +198,15 @@ func startController(ctx context.Context, testRegistry smoke_tests.TestRegistry)
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("failed to setup controller: %w", err)
 	}
+
+	// Signal ready once cache is synced (runs in background)
+	go func() {
+		cache := mgr.GetCache()
+		if cache.WaitForCacheSync(ctx) {
+			log.Println("controller cache synced")
+			close(ready)
+		}
+	}()
 
 	log.Println("starting SmokeTest controller")
 

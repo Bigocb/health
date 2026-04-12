@@ -1,5 +1,5 @@
 # Multi-stage build
-FROM golang:1.21-alpine AS builder
+FROM golang:1.22-alpine AS builder
 
 WORKDIR /app
 
@@ -18,8 +18,8 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o health-re
 # Final stage
 FROM alpine:3.19
 
-# Install ca-certificates for HTTPS
-RUN apk --no-cache add ca-certificates
+# Install ca-certificates for HTTPS and procps for pgrep (liveness probe)
+RUN apk --no-cache add ca-certificates procps
 
 WORKDIR /app
 

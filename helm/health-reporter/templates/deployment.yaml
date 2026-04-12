@@ -1,45 +1,39 @@
-{{- if eq .Values.mode "deployment" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "health-reporter.fullname" . }}
   namespace: {{ .Values.namespace }}
   labels:
-    app: {{ include "health-reporter.name" . }}
-    chart: {{ include "health-reporter.chart" . }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    {{- include "health-reporter.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.deployment.replicas }}
+  replicas: 1
   strategy:
-    {{- toYaml .Values.deployment.strategy | nindent 4 }}
+    type: Recreate
   
   selector:
     matchLabels:
-      app: {{ include "health-reporter.name" . }}
-      release: {{ .Release.Name }}
+      {{- include "health-reporter.selectorLabels" . | nindent 6 }}
   
   template:
     metadata:
       labels:
-        app: {{ include "health-reporter.name" . }}
-        release: {{ .Release.Name }}
+        {{- include "health-reporter.selectorLabels" . | nindent 8 }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}
-      {{- if .Values.nodeSelector }}
+      {{- with .Values.nodeSelector }}
       nodeSelector:
-        {{- toYaml .Values.nodeSelector | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.tolerations }}
+      {{- with .Values.tolerations }}
       tolerations:
-        {{- toYaml .Values.tolerations | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.affinity }}
+      {{- with .Values.affinity }}
       affinity:
-        {{- toYaml .Values.affinity | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
       {{- end }}
       
       containers:
@@ -51,7 +45,7 @@ spec:
           - "--config"
           - "/etc/health-reporter/config.yaml"
           - "--interval"
-          - "1h"
+          - {{ .Values.reporting.interval | quote }}
           {{- if .Values.logging.verbose }}
           - "--verbose"
           {{- end }}
@@ -62,27 +56,44 @@ spec:
             secretKeyRef:
               name: {{ .Values.discord.webhookSecret }}
               key: webhook-url
+        - name: WATCH_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         {{- range $key, $value := .Values.env }}
         - name: {{ $key }}
           value: {{ $value | quote }}
         {{- end }}
         
         resources:
-          {{- toYaml .Values.deployment.resources | nindent 12 }}
+          {{- toYaml .Values.resources | nindent 12 }}
         
         volumeMounts:
         - name: config
           mountPath: /etc/health-reporter
           readOnly: true
-        {{- range .Values.volumeMounts }}
-        - {{- toYaml . | nindent 12 }}
-        {{- end }}
+        
+        livenessProbe:
+          exec:
+            command:
+              - /bin/sh
+              - -c
+              - pgrep -f health-reporter
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          timeoutSeconds: 5
+        
+        readinessProbe:
+          exec:
+            command:
+              - /bin/sh
+              - -c
+              - pgrep -f health-reporter
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
       
       volumes:
       - name: config
         configMap:
           name: {{ include "health-reporter.fullname" . }}-config
-      {{- range .Values.volumes }}
-      - {{- toYaml . | nindent 8 }}
-      {{- end }}
-{{- end }}

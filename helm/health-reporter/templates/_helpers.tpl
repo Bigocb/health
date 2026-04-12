@@ -27,3 +27,23 @@ Create chart name and version as used by the chart label.
 {{- define "health-reporter.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
+
+{{/*
+Common labels
+*/}}
+{{- define "health-reporter.labels" -}}
+helm.sh/chart: {{ include "health-reporter.chart" . }}
+{{ include "health-reporter.selectorLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{/*
+Selector labels
+*/}}
+{{- define "health-reporter.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "health-reporter.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
