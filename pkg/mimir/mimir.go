@@ -295,10 +295,11 @@ func (c *Client) queryStorageMetrics(ctx context.Context, m *Metrics) error {
 // queryResourceMetrics queries resource usage from Mimir
 func (c *Client) queryResourceMetrics(ctx context.Context, m *Metrics) error {
 	queries := map[string]string{
-		"cpu_usage":     `round(100*(1-avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))),1)`,
-		"mem_usage":     `round(100*(1-sum(node_memory_MemAvailable_bytes)/sum(node_memory_MemTotal_bytes)),1)`,
-		"disk_usage":    `round(100*(1-sum(node_filesystem_avail_bytes{mountpoint="/"})/sum(node_filesystem_size_bytes{mountpoint="/"})),1)`,
-		"mem_available": `round(sum(node_memory_MemAvailable_bytes)/1024/1024/1024,1)`,
+		"cpu_usage":       `round(100*(1-avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))),1)`,
+		"mem_usage":       `round(100*(1-sum(node_memory_MemAvailable_bytes)/sum(node_memory_MemTotal_bytes)),1)`,
+		"disk_usage":      `round(100*(1-sum(node_filesystem_avail_bytes{mountpoint="/"})/sum(node_filesystem_size_bytes{mountpoint="/"})),1)`,
+		"mem_available":   `round(sum(node_memory_MemAvailable_bytes)/1024/1024/1024,1)`,
+		"disk_available":  `round(sum(node_filesystem_avail_bytes{mountpoint="/"})/1024/1024/1024,1)`,
 	}
 
 	results, err := c.queryRange(ctx, queries)
@@ -316,6 +317,7 @@ func (c *Client) queryResourceMetrics(ctx context.Context, m *Metrics) error {
 	m.Resources.MemoryUsagePercent = floatValue(results["mem_usage"])
 	m.Resources.DiskUsagePercent = floatValue(results["disk_usage"])
 	m.Resources.AvailableMemoryGB = floatValue(results["mem_available"])
+	m.Resources.AvailableStorageGB = floatValue(results["disk_available"])
 
 	return nil
 }

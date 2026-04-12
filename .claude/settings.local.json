@@ -12,7 +12,9 @@
       "Bash(docker build:*)",
       "Bash(docker push:*)",
       "Bash(cat C:/Users/bigoc/dev/health/.github/workflows/*.yml)",
-      "Bash(gh run:*)"
+      "Bash(gh run:*)",
+      "Bash(kubectl wait:*)",
+      "Bash(grep -n \"func.*GetMetrics\" C:/Users/bigoc/dev/health/pkg/mimir/*.go)"
     ]
   }
 }

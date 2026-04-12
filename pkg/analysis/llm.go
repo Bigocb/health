@@ -204,6 +204,92 @@ Before responding, verify:
 - You said "DATA_NOT_PROVIDED" for any missing data ✓`, metrics, trends, smokeTests, status)
 }
 
+// GenerateDataAnalysisPrompt creates a prompt for Phase 1: structured data analysis with thresholds
+func (l *LLMClient) GenerateDataAnalysisPrompt(metrics string, trends string) string {
+	return fmt.Sprintf(`You are a Kubernetes cluster health analyst. Your task is to classify metrics and identify issues.
+
+## Thresholds for Health Classification
+- CPU Usage: Good <70%%, Elevated 70-85%%, Critical >85%%
+- Memory Usage: Good <75%%, Elevated 75-90%%, Critical >90%%
+- Disk Usage: Good <80%%, Elevated 80-95%%, Critical >95%%
+- Unschedulable Nodes: Any count >0 is elevated
+
+## Provided Cluster Metrics
+%s
+
+## Recent Trends
+%s
+
+## Your Task: Classify Each Metric
+For each metric, determine its status (good/elevated/critical) using the thresholds above.
+
+Respond with ONLY valid JSON (no markdown, no commentary):
+{
+  "overall_health": "healthy|degraded|critical",
+  "metrics_summary": {
+    "cpu_usage_percent": {"value": <number>, "status": "good|elevated|critical"},
+    "memory_usage_percent": {"value": <number>, "status": "good|elevated|critical"},
+    "disk_usage_percent": {"value": <number>, "status": "good|elevated|critical"},
+    "available_memory_gb": {"value": <number>},
+    "available_storage_gb": {"value": <number>},
+    "nodes_total": {"value": <number>},
+    "nodes_ready": {"value": <number>},
+    "nodes_unschedulable": {"value": <number>, "status": "good|elevated|critical"},
+    "pods_total": {"value": <number>},
+    "pods_running": {"value": <number>},
+    "pods_failed": {"value": <number>, "status": "good|elevated|critical"},
+    "pods_pending": {"value": <number>, "status": "good|elevated|critical"}
+  },
+  "flagged_issues": [
+    {
+      "metric": "metric_name",
+      "value": <number>,
+      "severity": "elevated|critical",
+      "description": "brief description"
+    }
+  ]
+}
+
+Only include flagged_issues if status is elevated or critical. Return valid JSON only.`, metrics, trends)
+}
+
+// GenerateNarrativePrompt creates a prompt for Phase 2: narrative generation based on structured analysis
+func (l *LLMClient) GenerateNarrativePrompt(dataAnalysisJSON string, smokeTests string, logContext string) string {
+	return fmt.Sprintf(`You are a Kubernetes cluster health analyst. Based on structured analysis, generate a narrative report.
+
+## Structured Data Analysis (Phase 1 Results)
+%s
+
+## Additional Context
+
+### Smoke Tests
+%s
+
+### Recent Logs
+%s
+
+## Your Task: Generate Executive Report
+Using ONLY the issues flagged in the structured analysis, provide exactly 3 sections:
+
+### 1. Executive Summary (2-3 sentences)
+Summarize cluster health. If issues were flagged, mention them with specific values. Otherwise, state the cluster is operating normally.
+
+### 2. Critical Issues
+List ONLY flagged issues with:
+- Issue Name
+- Current Value (exact number)
+- Severity
+
+If none flagged, write: "No critical issues identified."
+
+### 3. Recommendations
+Provide 3 specific actions:
+- If issues flagged: Focus on resolving them
+- If no issues: Proactive maintenance suggestions
+
+Format: "Monitor [specific metric] at [value] because [reason]"`, dataAnalysisJSON, smokeTests, logContext)
+}
+
 func (l *LLMClient) IsAvailable(ctx context.Context) bool {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()

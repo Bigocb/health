@@ -194,25 +194,37 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 
 	if r.llmClient != nil && r.llmClient.IsAvailable(ctx) {
 		metricsText := r.formatMetricsAsText(report.ClusterMetrics)
-
 		smokeTestsJSON, _ := json.Marshal(report.SmokeTests)
-		podDetails := r.getPodDetails(ctx, report)
 
-		enhancedPrompt := r.llmClient.GenerateEnhancedPrompt(
+		// Phase 1: Data Analysis - Classify metrics with thresholds
+		dataAnalysisPrompt := r.llmClient.GenerateDataAnalysisPrompt(
 			metricsText,
 			fmt.Sprintf("%+v", result.Trends),
-			fmt.Sprintf("%+v", result.Anomalies),
-			string(smokeTestsJSON),
-			string(report.Status),
-			logContext,
-			podDetails,
 		)
 
-		log.Printf("LLM prompt length: %d chars", len(enhancedPrompt))
-		log.Printf("LLM prompt (first 1000 chars): %.1000s", enhancedPrompt)
+		log.Printf("LLM Phase 1 - Data Analysis prompt length: %d chars", len(dataAnalysisPrompt))
 
-		if llmAnalysis, err := r.llmClient.Analyze(ctx, enhancedPrompt); err == nil {
+		dataAnalysisJSON, err := r.llmClient.Analyze(ctx, dataAnalysisPrompt)
+		if err != nil {
+			log.Printf("LLM Phase 1 failed: %v", err)
+			return result
+		}
+
+		log.Printf("LLM Phase 1 analysis: %s", dataAnalysisJSON)
+
+		// Phase 2: Narrative Generation - Create report based on analysis
+		narrativePrompt := r.llmClient.GenerateNarrativePrompt(
+			dataAnalysisJSON,
+			string(smokeTestsJSON),
+			logContext,
+		)
+
+		log.Printf("LLM Phase 2 - Narrative prompt length: %d chars", len(narrativePrompt))
+
+		if llmAnalysis, err := r.llmClient.Analyze(ctx, narrativePrompt); err == nil {
 			result.HealthSummary = llmAnalysis
+		} else {
+			log.Printf("LLM Phase 2 failed: %v", err)
 		}
 	}
 
