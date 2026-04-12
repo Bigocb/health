@@ -42,6 +42,15 @@ type Concern struct {
 	Details  string `json:"details"`
 }
 
+// Recommendation represents an actionable recommendation
+type Recommendation struct {
+	Priority  string   `json:"priority"`
+	Category  string   `json:"category"`
+	Action    string   `json:"action"`
+	Rationale string   `json:"rationale"`
+	Steps     []string `json:"steps"`
+}
+
 // ToJSON serializes report to JSON
 func (r *Report) ToJSON() (string, error) {
 	data, err := json.MarshalIndent(r, "", "  ")

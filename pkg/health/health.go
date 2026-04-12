@@ -5,27 +5,40 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ArchipelagoAI/health-reporter/pkg/analysis"
 	"github.com/ArchipelagoAI/health-reporter/pkg/mimir"
 	"github.com/ArchipelagoAI/health-reporter/pkg/smoke_tests"
+	"github.com/ArchipelagoAI/health-reporter/pkg/storage"
 	"github.com/ArchipelagoAI/health-reporter/pkg/types"
 	"github.com/ArchipelagoAI/health-reporter/pkg/webhook"
 )
 
-// Concern represents an identified issue
 type Concern struct {
 	Title    string `json:"title"`
-	Severity string `json:"severity"` // "low", "medium", "high"
+	Severity string `json:"severity"`
 	Details  string `json:"details"`
 }
 
-// Reporter generates health reports
 type Reporter struct {
 	mimirClient  *mimir.Client
 	sender       webhook.Sender
 	testRegistry smoke_tests.TestRegistry
+	historyMgr   *storage.HistoryManager
+	analyzer     *analysis.TrendDetector
+	llmClient    *analysis.LLMClient
+	analysisCfg  analysis.Config
 }
 
-// NewReporter creates a new health reporter
+type Config struct {
+	StorageDir      string
+	RetentionHours  int
+	AnalysisEnabled bool
+	LLMEnabled      bool
+	LLMEndpoint     string
+	LLMModel        string
+	LLMTimeout      int
+}
+
 func NewReporter(mimirClient *mimir.Client, sender webhook.Sender) *Reporter {
 	return &Reporter{
 		mimirClient:  mimirClient,
@@ -34,20 +47,32 @@ func NewReporter(mimirClient *mimir.Client, sender webhook.Sender) *Reporter {
 	}
 }
 
-// SetTestRegistry sets the smoke test registry
 func (r *Reporter) SetTestRegistry(registry smoke_tests.TestRegistry) {
 	r.testRegistry = registry
 }
 
-// Generate generates a health report from current metrics
+func (r *Reporter) SetHistoryManager(mgr *storage.HistoryManager) {
+	r.historyMgr = mgr
+}
+
+func (r *Reporter) SetAnalyzer(analyzer *analysis.TrendDetector) {
+	r.analyzer = analyzer
+}
+
+func (r *Reporter) SetLLMClient(client *analysis.LLMClient) {
+	r.llmClient = client
+}
+
+func (r *Reporter) SetAnalysisConfig(cfg analysis.Config) {
+	r.analysisCfg = cfg
+}
+
 func (r *Reporter) Generate(ctx context.Context) (*types.Report, error) {
-	// Get metrics from Mimir
 	metrics, err := r.mimirClient.GetMetrics(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get metrics: %w", err)
 	}
 
-	// Analyze metrics
 	report := &types.Report{
 		Timestamp: time.Now().UTC(),
 		ClusterMetrics: map[string]interface{}{
@@ -73,7 +98,6 @@ func (r *Reporter) Generate(ctx context.Context) (*types.Report, error) {
 		},
 	}
 
-	// Run smoke tests if registry is available
 	if r.testRegistry != nil {
 		smokeTestResults := r.testRegistry.RunAllTests(ctx)
 		for _, result := range smokeTestResults {
@@ -88,23 +112,55 @@ func (r *Reporter) Generate(ctx context.Context) (*types.Report, error) {
 		}
 	}
 
-	// Calculate overall status
 	report.Status = r.calculateStatus(metrics)
 	report.Summary = r.generateSummary(metrics, report.Status)
 	report.Concerns = r.identifyConcerns(metrics)
 	report.Recommendations = r.generateRecommendations(report)
 
+	if r.historyMgr != nil {
+		if err := r.historyMgr.SaveReport(ctx, report); err != nil {
+			_ = fmt.Errorf("failed to save report: %v", err)
+		}
+
+		if err := r.historyMgr.CleanupOldReports(ctx); err != nil {
+			_ = fmt.Errorf("failed to cleanup old reports: %v", err)
+		}
+	}
+
 	return report, nil
 }
 
-// SendReport sends the report to webhook
+func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.AnalysisResult {
+	if r.analyzer == nil || r.historyMgr == nil {
+		return nil
+	}
+
+	historicalReports, err := r.historyMgr.LoadReports(ctx, 24)
+	if err != nil {
+		return nil
+	}
+
+	result := r.analyzer.Analyze(ctx, report, historicalReports)
+
+	if r.llmClient != nil && r.llmClient.IsAvailable(ctx) {
+		prompt := r.llmClient.GenerateAnalysisPrompt(
+			report.Summary,
+			fmt.Sprintf("%+v", result.Trends),
+			fmt.Sprintf("%+v", result.Anomalies),
+		)
+		if llmAnalysis, err := r.llmClient.Analyze(ctx, prompt); err == nil {
+			result.HealthSummary = llmAnalysis + "\n\n" + result.HealthSummary
+		}
+	}
+
+	return result
+}
+
 func (r *Reporter) SendReport(ctx context.Context, report *types.Report) error {
 	return r.sender.Send(ctx, report)
 }
 
-// calculateStatus determines overall cluster health
 func (r *Reporter) calculateStatus(metrics *mimir.Metrics) types.HealthStatus {
-	// Critical: multiple failed pods, node down, or high resource usage
 	if metrics.Pods.Failed > 10 || metrics.Nodes.NotReady > 0 {
 		return types.StatusCritical
 	}
@@ -113,7 +169,6 @@ func (r *Reporter) calculateStatus(metrics *mimir.Metrics) types.HealthStatus {
 		return types.StatusCritical
 	}
 
-	// Degraded: some failed pods, restarts, or elevated resource usage
 	if metrics.Pods.Failed > 0 || metrics.Pods.Restarts > 5 {
 		return types.StatusDegraded
 	}
@@ -125,7 +180,6 @@ func (r *Reporter) calculateStatus(metrics *mimir.Metrics) types.HealthStatus {
 	return types.StatusHealthy
 }
 
-// generateSummary creates a brief summary of cluster status
 func (r *Reporter) generateSummary(metrics *mimir.Metrics, status types.HealthStatus) string {
 	m := metrics
 
@@ -151,11 +205,9 @@ func (r *Reporter) generateSummary(metrics *mimir.Metrics, status types.HealthSt
 	}
 }
 
-// identifyConcerns identifies specific issues in the cluster
 func (r *Reporter) identifyConcerns(metrics *mimir.Metrics) []types.Concern {
 	var concerns []types.Concern
 
-	// Check node health
 	if metrics.Nodes.NotReady > 0 {
 		concerns = append(concerns, types.Concern{
 			Title:    "Nodes Not Ready",
@@ -164,7 +216,6 @@ func (r *Reporter) identifyConcerns(metrics *mimir.Metrics) []types.Concern {
 		})
 	}
 
-	// Check pod health
 	if metrics.Pods.Failed > 0 {
 		concerns = append(concerns, types.Concern{
 			Title:    "Failed Pods",
@@ -189,7 +240,6 @@ func (r *Reporter) identifyConcerns(metrics *mimir.Metrics) []types.Concern {
 		})
 	}
 
-	// Check resource pressure
 	if metrics.Resources.CPUUsagePercent > 90 {
 		concerns = append(concerns, types.Concern{
 			Title:    "High CPU Usage",
@@ -221,7 +271,6 @@ func (r *Reporter) identifyConcerns(metrics *mimir.Metrics) []types.Concern {
 	return concerns
 }
 
-// generateRecommendations suggests actions based on identified concerns
 func (r *Reporter) generateRecommendations(report *types.Report) []string {
 	var recommendations []string
 

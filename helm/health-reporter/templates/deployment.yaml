@@ -72,6 +72,9 @@ spec:
         - name: config
           mountPath: /etc/health-reporter
           readOnly: true
+        - name: reports
+          mountPath: /var/lib/health-reporter/reports
+          readWrite: true
         
         livenessProbe:
           exec:
@@ -97,3 +100,5 @@ spec:
       - name: config
         configMap:
           name: {{ include "health-reporter.fullname" . }}-config
+      - name: reports
+        emptyDir: {}

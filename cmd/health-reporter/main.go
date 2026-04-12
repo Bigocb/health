@@ -15,14 +15,16 @@ import (
 
 	healthv1alpha1 "github.com/ArchipelagoAI/health-reporter/api/v1alpha1"
 	"github.com/ArchipelagoAI/health-reporter/controllers"
+	"github.com/ArchipelagoAI/health-reporter/pkg/analysis"
 	"github.com/ArchipelagoAI/health-reporter/pkg/config"
 	"github.com/ArchipelagoAI/health-reporter/pkg/health"
 	"github.com/ArchipelagoAI/health-reporter/pkg/mimir"
 	"github.com/ArchipelagoAI/health-reporter/pkg/smoke_tests"
+	"github.com/ArchipelagoAI/health-reporter/pkg/storage"
 	"github.com/ArchipelagoAI/health-reporter/pkg/webhook"
 )
 
-const version = "0.2.0"
+const version = "0.3.0"
 
 func main() {
 	var (
@@ -80,9 +82,38 @@ func main() {
 	reporter := health.NewReporter(mimirClient, webhookSender)
 	reporter.SetTestRegistry(testRegistry)
 
+	// Initialize storage for historical reports
+	historyMgr := storage.NewHistoryManager(cfg.Storage.ReportsDirectory, cfg.Storage.RetentionHours)
+	reporter.SetHistoryManager(historyMgr)
+
+	// Initialize trend analyzer
+	if cfg.Analysis.Enabled {
+		trendCfg := analysis.Config{
+			WindowHours:      cfg.Analysis.Trends.WindowHours,
+			AnomalyThreshold: cfg.Analysis.Trends.AnomalyThreshold,
+			MinDataPoints:    cfg.Analysis.Trends.MinDataPoints,
+		}
+		analyzer := analysis.NewTrendDetector(trendCfg.WindowHours, trendCfg.AnomalyThreshold, trendCfg.MinDataPoints)
+		reporter.SetAnalyzer(analyzer)
+
+		// Initialize LLM client if enabled
+		if cfg.Analysis.LLM.Enabled {
+			llmClient := analysis.NewLLMClient(
+				cfg.Analysis.LLM.Endpoint,
+				cfg.Analysis.LLM.Model,
+				cfg.Analysis.LLM.TimeoutSeconds,
+				cfg.Analysis.LLM.MaxRetries,
+			)
+			reporter.SetLLMClient(llmClient)
+			log.Printf("LLM analysis enabled: %s at %s", cfg.Analysis.LLM.Model, cfg.Analysis.LLM.Endpoint)
+		}
+		log.Printf("trend analysis enabled (window: %dh)", cfg.Analysis.Trends.WindowHours)
+	}
+
 	log.Printf("health-reporter v%s started", version)
 	log.Printf("mimir: %s", cfg.Mimir.URL)
 	log.Printf("discord: %s", mask(cfg.Discord.WebhookURL))
+	log.Printf("storage: %s", cfg.Storage.ReportsDirectory)
 
 	// Setup root context with signal handling
 	ctx, cancel := context.WithCancel(context.Background())

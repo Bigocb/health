@@ -36,6 +36,26 @@ health:
   diskThreshold: 90
   restartLimit: 5
 
+# Storage configuration
+storage:
+  retentionHours: 168  # Keep 7 days of reports
+
+# Analysis configuration
+analysis:
+  enabled: false  # Enable for trend analysis
+  timeoutSeconds: 30
+  trends:
+    windowHours: 24
+    anomalyThreshold: 1.5
+    minDataPoints: 6
+  llm:
+    enabled: false
+    provider: "ollama"
+    model: "llama3.2:1b"
+    endpoint: "http://ollama:11434"
+    timeoutSeconds: 15
+    maxRetries: 2
+
 # Resource limits for the single deployment
 resources:
   requests:

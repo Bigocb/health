@@ -26,3 +26,22 @@ data:
       memory_threshold: {{ .Values.health.memoryThreshold }}
       disk_threshold: {{ .Values.health.diskThreshold }}
       restart_limit: {{ .Values.health.restartLimit }}
+    
+    storage:
+      reports_directory: "/var/lib/health-reporter/reports"
+      retention_hours: {{ .Values.storage.retentionHours }}
+    
+    analysis:
+      enabled: {{ .Values.analysis.enabled }}
+      timeout_seconds: {{ .Values.analysis.timeoutSeconds }}
+      trends:
+        window_hours: {{ .Values.analysis.trends.windowHours }}
+        anomaly_threshold: {{ .Values.analysis.trends.anomalyThreshold }}
+        min_data_points: {{ .Values.analysis.trends.minDataPoints }}
+      llm:
+        enabled: {{ .Values.analysis.llm.enabled }}
+        provider: {{ .Values.analysis.llm.provider | quote }}
+        model: {{ .Values.analysis.llm.model | quote }}
+        endpoint: {{ .Values.analysis.llm.endpoint | quote }}
+        timeout_seconds: {{ .Values.analysis.llm.timeoutSeconds }}
+        max_retries: {{ .Values.analysis.llm.maxRetries }}
