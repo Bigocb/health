@@ -175,22 +175,28 @@ func main() {
 }
 
 func runReport(reporter *health.Reporter) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
-	defer cancel()
-
-	report, err := reporter.Generate(ctx)
+	// Generate metrics (Mimir queries) - 2 minute timeout
+	genCtx, genCancel := context.WithTimeout(context.Background(), 120*time.Second)
+	report, err := reporter.Generate(genCtx)
+	genCancel()
 	if err != nil {
 		return fmt.Errorf("failed to generate report: %w", err)
 	}
 
-	// Run analysis if configured
+	// Run analysis if configured (Phase 1 + Phase 2 LLM calls) - 5 minute timeout
 	var analysis *analysis.AnalysisResult
 	if reporter.HasAnalyzer() {
-		analysis = reporter.Analyze(ctx, report)
+		analyzeCtx, analyzeCancel := context.WithTimeout(context.Background(), 300*time.Second)
+		analysis = reporter.Analyze(analyzeCtx, report)
+		analyzeCancel()
 		if analysis != nil {
 			log.Printf("analysis: %s (confidence: %.2f)", analysis.HealthSummary, analysis.ConfidenceScore)
 		}
 	}
+
+	// Save and send report (quick operations) - 1 minute timeout
+	reportCtx, reportCancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer reportCancel()
 
 	// Save analysis to report before sending (so it's saved to disk)
 	if analysis != nil {
@@ -202,12 +208,12 @@ func runReport(reporter *health.Reporter) error {
 			"predictions":      analysis.Predictions,
 		}
 		// Update the saved report with analysis
-		if err := reporter.SaveReportWithAnalysis(ctx, report); err != nil {
+		if err := reporter.SaveReportWithAnalysis(reportCtx, report); err != nil {
 			log.Printf("failed to save report with analysis: %v", err)
 		}
 	}
 
-	if err := reporter.SendReportWithAnalysis(ctx, report, analysis); err != nil {
+	if err := reporter.SendReportWithAnalysis(reportCtx, report, analysis); err != nil {
 		return fmt.Errorf("failed to send report: %w", err)
 	}
 
