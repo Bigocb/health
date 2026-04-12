@@ -206,6 +206,9 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 			podDetails,
 		)
 
+		log.Printf("LLM prompt length: %d chars", len(enhancedPrompt))
+		log.Printf("LLM prompt (first 1000 chars): %.1000s", enhancedPrompt)
+
 		if llmAnalysis, err := r.llmClient.Analyze(ctx, enhancedPrompt); err == nil {
 			result.HealthSummary = llmAnalysis
 		}
