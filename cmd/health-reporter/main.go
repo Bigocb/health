@@ -186,7 +186,7 @@ func runReport(reporter *health.Reporter) error {
 	// Run analysis if configured (Phase 1 + Phase 2 LLM calls) - 8 minute timeout
 	var analysis *analysis.AnalysisResult
 	if reporter.HasAnalyzer() {
-		analyzeCtx, analyzeCancel := context.WithTimeout(context.Background(), 480*time.Second)
+		analyzeCtx, analyzeCancel := context.WithTimeout(context.Background(), 480*time.Second)  // 8 minutes
 		analysis = reporter.Analyze(analyzeCtx, report)
 		analyzeCancel()
 		if analysis != nil {
