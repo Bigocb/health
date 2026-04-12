@@ -358,16 +358,11 @@ func ValidatePhase1Response(jsonStr string) string {
 	log.Printf("[VALIDATOR] Starting validation of Phase 1 response (length: %d chars)", len(jsonStr))
 	thresholds := DefaultThresholds()
 
-	// Strip markdown code fence markers if present
-	cleanedStr := strings.TrimSpace(jsonStr)
-	if strings.HasPrefix(cleanedStr, "```json") {
-		cleanedStr = strings.TrimPrefix(cleanedStr, "```json")
-		cleanedStr = strings.TrimSuffix(cleanedStr, "```")
-		cleanedStr = strings.TrimSpace(cleanedStr)
-	} else if strings.HasPrefix(cleanedStr, "```") {
-		cleanedStr = strings.TrimPrefix(cleanedStr, "```")
-		cleanedStr = strings.TrimSuffix(cleanedStr, "```")
-		cleanedStr = strings.TrimSpace(cleanedStr)
+	// Extract first valid JSON object from the response (LLM may return multiple blocks)
+	cleanedStr := extractFirstJSON(jsonStr)
+	if cleanedStr == "" {
+		log.Printf("[VALIDATOR] Could not extract valid JSON from response")
+		return jsonStr
 	}
 
 	var response struct {
@@ -378,7 +373,7 @@ func ValidatePhase1Response(jsonStr string) string {
 	}
 
 	if err := json.Unmarshal([]byte(cleanedStr), &response); err != nil {
-		log.Printf("[VALIDATOR] Failed to parse Phase 1 response: %v (after stripping markdown)", err)
+		log.Printf("[VALIDATOR] Failed to parse Phase 1 response: %v", err)
 		return jsonStr // Return unchanged if parse fails
 	}
 
@@ -484,4 +479,55 @@ func ValidatePhase1Response(jsonStr string) string {
 
 	log.Printf("[VALIDATOR] Phase 1 response validated and corrected")
 	return string(correctedBytes)
+}
+
+// extractFirstJSON finds and extracts the first valid JSON object from text (handles markdown and multiple blocks)
+func extractFirstJSON(text string) string {
+	// Find first markdown code fence if present
+	text = strings.TrimSpace(text)
+
+	// Try to find and extract markdown-wrapped JSON
+	if idx := strings.Index(text, "```"); idx != -1 {
+		// Found markdown fence, extract content between fences
+		startIdx := idx + 3
+		// Skip optional 'json' language marker
+		if strings.HasPrefix(text[startIdx:], "json") {
+			startIdx += 4
+		}
+		// Find closing fence
+		if endIdx := strings.Index(text[startIdx:], "```"); endIdx != -1 {
+			text = text[startIdx : startIdx+endIdx]
+		}
+	}
+
+	text = strings.TrimSpace(text)
+
+	// Find first '{' character
+	braceIdx := strings.IndexByte(text, '{')
+	if braceIdx == -1 {
+		return ""
+	}
+
+	text = text[braceIdx:]
+
+	// Find matching closing brace for the first object
+	braceCount := 0
+	for i, ch := range text {
+		if ch == '{' {
+			braceCount++
+		} else if ch == '}' {
+			braceCount--
+			if braceCount == 0 {
+				// Found matching closing brace
+				candidate := text[:i+1]
+				// Verify it's valid JSON
+				var test interface{}
+				if err := json.Unmarshal([]byte(candidate), &test); err == nil {
+					return candidate
+				}
+			}
+		}
+	}
+
+	return ""
 }
