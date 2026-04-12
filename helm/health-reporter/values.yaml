@@ -39,6 +39,10 @@ health:
 # Storage configuration
 storage:
   retentionHours: 168  # Keep 7 days of reports
+  pvc:
+    create: true  # Use PVC for persistent report storage
+    size: 1Gi
+    storageClass: ""  # Use default storage class
 
 # Analysis configuration
 analysis:

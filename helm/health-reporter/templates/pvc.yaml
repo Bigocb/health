@@ -1,0 +1,21 @@
+{{- if .Values.storage.pvc.create }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "health-reporter.fullname" . }}-reports
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ include "health-reporter.name" . }}
+    chart: {{ include "health-reporter.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.storage.pvc.size | default "1Gi" }}
+{{- if .Values.storage.pvc.storageClass }}
+  storageClassName: {{ .Values.storage.pvc.storageClass }}
+{{- end }}
+{{- end }}

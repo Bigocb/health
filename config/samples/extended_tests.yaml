@@ -1,21 +1,21 @@
-apiVersion: health.archipelago.ai/v1alpha1
-kind: SmokeTest
-metadata:
-  name: kubernetes-api
-  namespace: monitoring
-  labels:
-    app: health-reporter
-    test-type: http
-spec:
-  type: http
-  enabled: true
-  severity: critical
-  timeout: "10s"
-  interval: "1m"
-  url: "https://kubernetes.default.svc:443/healthz"
-  expectedStatus: 200
-  tlsInsecure: true
-  useServiceAccountToken: true
+# apiVersion: health.archipelago.ai/v1alpha1
+# kind: SmokeTest
+# metadata:
+#   name: kubernetes-api
+#   namespace: monitoring
+#   labels:
+#     app: health-reporter
+#     test-type: http
+# spec:
+#   type: http
+#   enabled: true
+#   severity: critical
+#   timeout: "10s"
+#   interval: "1m"
+#   url: "https://kubernetes.default.svc:443/healthz"
+#   expectedStatus: 200
+#   tlsInsecure: true
+#   useServiceAccountToken: true
 
 # apiVersion: health.archipelago.ai/v1alpha1
 # kind: SmokeTest

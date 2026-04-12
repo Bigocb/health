@@ -100,4 +100,9 @@ spec:
         configMap:
           name: {{ include "health-reporter.fullname" . }}-config
       - name: reports
+        {{- if .Values.storage.pvc.create }}
+        persistentVolumeClaim:
+          claimName: {{ include "health-reporter.fullname" . }}-reports
+        {{- else }}
         emptyDir: {}
+        {{- end }}
