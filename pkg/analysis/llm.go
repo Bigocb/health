@@ -45,19 +45,17 @@ func NewLLMClient(endpoint, model string, timeoutSeconds, maxRetries int) *LLMCl
 }
 
 func (l *LLMClient) Analyze(ctx context.Context, prompt string) (string, error) {
-	// Disabled prompt caching - was causing short responses to be reused
-	// if cached, ok := l.promptCache[prompt]; ok {
-	// 	return cached, nil
-	// }
+	log.Printf("[LLM] Analyzing prompt, calling API (no caching)")
 
 	var lastErr error
 	for i := 0; i < l.maxRetries; i++ {
 		resp, err := l.callAPI(ctx, prompt)
-		if err == nil && len(resp) > 10 { // Only cache non-empty responses
-			l.promptCache[prompt] = resp
+		if err == nil && len(resp) > 10 {
+			log.Printf("[LLM] Got response, length: %d chars", len(resp))
 			return resp, nil
 		}
 		lastErr = err
+		log.Printf("[LLM] Attempt %d failed: %v", i+1, err)
 		time.Sleep(time.Duration(i+1) * time.Second)
 	}
 
