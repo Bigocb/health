@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -64,6 +65,14 @@ func (h *HTTPTest) Run(ctx context.Context) (*TestResult, error) {
 	if h.config.Headers != nil {
 		for key, value := range h.config.Headers {
 			req.Header.Set(key, value)
+		}
+	}
+
+	// Add service account token if configured
+	if h.config.UseServiceAccountToken {
+		token, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
+		if err == nil {
+			req.Header.Set("Authorization", "Bearer "+string(token))
 		}
 	}
 

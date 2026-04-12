@@ -182,6 +182,37 @@ spec:
 
 ---
 
+## Current Issues (2026-04-11)
+
+### Failing Smoke Tests (2026-04-11 Evening)
+
+| Test Name | Status | Error | Action Needed |
+|-----------|--------|-------|---------------|
+| kubernetes-api-health | ❌ FAIL | HTTP 401 (expected 200) | Needs ServiceAccount token auth |
+| kubernetes-api | ❌ FAIL | HTTP 401 (expected 200) | Needs ServiceAccount token auth |
+| mimir-health | ❌ FAIL | HTTP 404 (expected 200) | Verify endpoint path |
+| higress-gateway | ❌ FAIL | HTTP 404 (expected 200) | Verify endpoint path |
+| grafana-health | ❌ FAIL | Connection timeout (5s) | Check if Grafana is accessible |
+
+### Passing Tests
+
+| Test Name | Status |
+|-----------|--------|
+| kubernetes-dns | ✅ PASS |
+| coredns-external | ✅ PASS |
+| argocd-health | ✅ PASS |
+
+### Pod Metrics Bug
+
+**Issue**: Pod counts showing incorrect values
+- Running: 164
+- Pending: 164 (should be low, not equal to running!)
+- Failed: 164 (should be low, not equal to running!)
+
+**Status**: Investigating - queries look correct but all return same value
+
+---
+
 ## Future Work
 
 ### High Priority
@@ -197,6 +228,10 @@ spec:
 ### Lower Priority
 7. Mimir query latency test
 8. Grafana Alloy OTLP endpoint test
+
+### Research Needed
+9. **Data Persistence**: Currently reports stored in pod's filesystem (`/var/lib/health-reporter/reports`). If pod restarts, history is lost.
+   - Options: PVC, external DB (PostgreSQL), object storage (S3/Minio), separate reporting statefulset
 
 ---
 

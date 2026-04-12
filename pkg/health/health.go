@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/ArchipelagoAI/health-reporter/pkg/analysis"
@@ -169,8 +170,12 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 
 	historicalReports, err := r.historyMgr.LoadReports(ctx, 24)
 	if err != nil {
+		log.Printf("failed to load historical reports: %v", err)
 		return nil
 	}
+
+	log.Printf("trend analysis: loaded %d historical reports (need %d for trend analysis)",
+		len(historicalReports), 6)
 
 	result := r.analyzer.Analyze(ctx, report, historicalReports)
 

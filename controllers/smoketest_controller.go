@@ -126,19 +126,20 @@ func (r *SmokeTestReconciler) smokeTestToConfig(st *healthv1alpha1.SmokeTest, na
 	}
 
 	config := &smoke_tests.TestConfig{
-		Name:           fmt.Sprintf("%s/%s", namespace, st.Name),
-		Type:           string(st.Spec.Type),
-		Enabled:        st.Spec.Enabled,
-		Severity:       severity,
-		Timeout:        timeout,
-		Domain:         st.Spec.Domain,
-		URL:            st.Spec.URL,
-		Method:         st.Spec.Method,
-		ExpectedStatus: st.Spec.ExpectedStatus,
-		TLSInsecure:    st.Spec.TLSInsecure,
-		Headers:        st.Spec.Headers,
-		Host:           st.Spec.Host,
-		Port:           st.Spec.Port,
+		Name:                   fmt.Sprintf("%s/%s", namespace, st.Name),
+		Type:                   string(st.Spec.Type),
+		Enabled:                st.Spec.Enabled,
+		Severity:               severity,
+		Timeout:                timeout,
+		Domain:                 st.Spec.Domain,
+		URL:                    st.Spec.URL,
+		Method:                 st.Spec.Method,
+		ExpectedStatus:         st.Spec.ExpectedStatus,
+		TLSInsecure:            st.Spec.TLSInsecure,
+		Headers:                st.Spec.Headers,
+		UseServiceAccountToken: st.Spec.UseServiceAccountToken,
+		Host:                   st.Spec.Host,
+		Port:                   st.Spec.Port,
 	}
 
 	return config

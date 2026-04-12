@@ -10,7 +10,7 @@ spec:
   type: http
   enabled: true
   severity: critical
-  timeout: "5s"
+  timeout: "10s"
   interval: "2m"
-  url: "http://higress-gateway.higress-system.svc:80/healthz"
+  url: "http://higress-gateway.higress-system.svc:80/ready"
   expectedStatus: 200

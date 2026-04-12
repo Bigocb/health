@@ -18,19 +18,20 @@ type TestResult struct {
 
 // TestConfig defines a test to be executed
 type TestConfig struct {
-	Name           string
-	Type           string // dns, http, tcp
-	Enabled        bool
-	Severity       string // critical, high, medium, low
-	Timeout        time.Duration
-	Domain         string            // DNS
-	URL            string            // HTTP
-	Method         string            // HTTP (default: GET)
-	ExpectedStatus int               // HTTP
-	TLSInsecure    bool              // HTTP
-	Headers        map[string]string // HTTP
-	Host           string            // TCP
-	Port           int               // TCP
+	Name                   string
+	Type                   string // dns, http, tcp
+	Enabled                bool
+	Severity               string // critical, high, medium, low
+	Timeout                time.Duration
+	Domain                 string            // DNS
+	URL                    string            // HTTP
+	Method                 string            // HTTP (default: GET)
+	ExpectedStatus         int               // HTTP
+	TLSInsecure            bool              // HTTP
+	Headers                map[string]string // HTTP
+	UseServiceAccountToken bool              // HTTP (use pod's service account token)
+	Host                   string            // TCP
+	Port                   int               // TCP
 }
 
 // TestRunner defines the interface for all test types

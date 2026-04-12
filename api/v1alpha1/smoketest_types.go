@@ -104,6 +104,11 @@ type SmokeTestSpec struct {
 	// Headers are custom headers to include in the HTTP request
 	Headers map[string]string `json:"headers,omitempty"`
 
+	// UseServiceAccountToken enables automatic use of the pod's service account token
+	// for authentication to the Kubernetes API
+	// +kubebuilder:default:=false
+	UseServiceAccountToken bool `json:"useServiceAccountToken,omitempty"`
+
 	// --- TCP Test Fields ---
 
 	// Host is the host to connect to (for TCP tests)
