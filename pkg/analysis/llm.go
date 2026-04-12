@@ -502,58 +502,86 @@ func extractFirstJSON(text string) string {
 
 	text = strings.TrimSpace(text)
 
-	// Find first '{' character
-	braceIdx := strings.IndexByte(text, '{')
-	if braceIdx == -1 {
-		return ""
-	}
-
-	text = text[braceIdx:]
-
-	// Find matching closing brace for the first object
-	braceCount := 0
-	inString := false
-	escaped := false
-
-	for i, ch := range text {
-		if escaped {
-			escaped = false
-			continue
-		}
-
-		if ch == '\\' && inString {
-			escaped = true
-			continue
-		}
-
-		if ch == '"' {
-			inString = !inString
-			continue
-		}
-
-		if !inString {
-			if ch == '{' {
-				braceCount++
-			} else if ch == '}' {
-				braceCount--
-				if braceCount == 0 {
-					// Found matching closing brace
-					candidate := text[:i+1]
-
-					// Sanitize the JSON: fix unescaped newlines in strings
-					candidate = sanitizeJSON(candidate)
-
-					// Verify it's valid JSON
-					var test interface{}
-					if err := json.Unmarshal([]byte(candidate), &test); err == nil {
-						return candidate
-					}
-				}
-			}
+	// Try to find all potential JSON objects and return the first valid one
+	candidates := findAllJSONObjects(text)
+	for _, candidate := range candidates {
+		// Sanitize and try to parse
+		sanitized := sanitizeJSON(candidate)
+		var test interface{}
+		if err := json.Unmarshal([]byte(sanitized), &test); err == nil {
+			return sanitized
 		}
 	}
 
 	return ""
+}
+
+// findAllJSONObjects extracts all potential JSON objects from text
+func findAllJSONObjects(text string) []string {
+	var candidates []string
+
+	// Find all occurrences of '{' and try to find matching '}'
+	searchText := text
+	offset := 0
+
+	for {
+		braceIdx := strings.IndexByte(searchText, '{')
+		if braceIdx == -1 {
+			break
+		}
+
+		startIdx := offset + braceIdx
+		remaining := text[startIdx:]
+
+		// Try to find matching closing brace
+		braceCount := 0
+		inString := false
+		escaped := false
+		endIdx := -1
+
+		for i, ch := range remaining {
+			if escaped {
+				escaped = false
+				continue
+			}
+
+			if ch == '\\' && inString {
+				escaped = true
+				continue
+			}
+
+			if ch == '"' {
+				inString = !inString
+				continue
+			}
+
+			if !inString {
+				if ch == '{' {
+					braceCount++
+				} else if ch == '}' {
+					braceCount--
+					if braceCount == 0 {
+						endIdx = i
+						break
+					}
+				}
+			}
+		}
+
+		if endIdx != -1 {
+			candidate := remaining[:endIdx+1]
+			candidates = append(candidates, candidate)
+			// Move search position past this candidate
+			offset = startIdx + endIdx + 1
+			searchText = text[offset:]
+		} else {
+			// No matching brace found, move past this opening brace
+			offset = startIdx + 1
+			searchText = text[offset:]
+		}
+	}
+
+	return candidates
 }
 
 // sanitizeJSON fixes common JSON issues like unescaped newlines in string values
