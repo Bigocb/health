@@ -61,7 +61,7 @@ analysis:
   llm:
     enabled: true
     provider: "ollama"
-    model: "llama3.2:1b"
+    model: "qwen2.5:0.5b"
     endpoint: "http://ollama.ollama.svc.cluster.local:11434"
     timeoutSeconds: 60
     maxRetries: 2
