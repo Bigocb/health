@@ -95,9 +95,22 @@ func (l *LLMClient) callAPI(ctx context.Context, prompt string) (string, error) 
 		return "", fmt.Errorf("LLM returned status %d: %s", resp.StatusCode, string(body))
 	}
 
+	// Read full response body for debugging
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Try to parse and see what we get
 	var llmResp LLMResponse
-	if err := json.NewDecoder(resp.Body).Decode(&llmResp); err != nil {
+	if err := json.Unmarshal(bodyBytes, &llmResp); err != nil {
+		// Log the actual response for debugging
+		fmt.Printf("[DEBUG] LLM response raw: %.500s\n", string(bodyBytes))
 		return "", fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if llmResp.Response == "" {
+		fmt.Printf("[DEBUG] LLM response empty, raw: %.500s\n", string(bodyBytes))
 	}
 
 	return llmResp.Response, nil
