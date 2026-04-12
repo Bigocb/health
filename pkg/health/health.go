@@ -488,12 +488,15 @@ func (r *Reporter) generateRecommendations(report *types.Report) []string {
 
 func (r *Reporter) formatMetricsAsText(metrics map[string]interface{}) string {
 	var buf bytes.Buffer
+	fmt.Printf("[formatMetricsAsText] called with metrics keys: %v\n", getMapKeys(metrics))
 	buf.WriteString("cluster_metrics:\n")
 
 	// Nodes
 	if nodes, ok := metrics["nodes"].(map[string]interface{}); ok {
+		fmt.Printf("[formatMetricsAsText] nodes map found with keys: %v\n", getMapKeys(nodes))
 		buf.WriteString("  nodes:\n")
 		if v, ok := nodes["total"].(float64); ok {
+			fmt.Printf("[formatMetricsAsText] nodes.total = %f\n", v)
 			buf.WriteString(fmt.Sprintf("    total: %d\n", int(v)))
 		}
 		if v, ok := nodes["ready"].(float64); ok {
@@ -551,4 +554,13 @@ func (r *Reporter) formatMetricsAsText(metrics map[string]interface{}) string {
 	}
 
 	return buf.String()
+}
+
+// getMapKeys returns the keys of a map for debugging
+func getMapKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
