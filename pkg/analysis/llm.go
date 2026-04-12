@@ -224,6 +224,32 @@ func (l *LLMClient) GenerateDataAnalysisPrompt(metrics string, trends string) st
 ## Recent Trends
 %s
 
+## Your Analysis Task: Go Deep, Connect the Data
+
+IMPORTANT: Use ALL provided data to build comprehensive context:
+1. **Per-Node Analysis**: For each node in "Per-Node Metrics", extract:
+   - Node name, Ready status, Schedulable status
+   - CPU usage %%, Memory usage %%, Available memory
+   - Pod count on that node
+   - Apply thresholds to each node's metrics individually
+   - Flag correlations (e.g., unschedulable node with high CPU/memory)
+
+2. **Failed Pods Analysis**: Examine each failed pod:
+   - Which namespace and node is it on?
+   - What's the failure reason?
+   - Pattern analysis: Are failed pods concentrated on specific nodes?
+
+3. **Cluster Context**: Build a picture of overall health from:
+   - Aggregate metrics (cluster-wide CPU, Memory, Disk)
+   - Per-node distribution (are resources imbalanced?)
+   - Failed pod patterns (random? concentrated on one node?)
+   - Unschedulable nodes (why are they unschedulable?)
+
+4. **Correlations**: Identify relationships:
+   - Unschedulable node + High CPU/Memory = Resource pressure
+   - Failed pods on same node = Node health issue
+   - Imbalanced resource distribution = Scheduling problem
+
 ## Your Task: Classify Each Metric Using EXACT THRESHOLDS
 CRITICAL: Apply these EXACT thresholds. Do not deviate. Do not interpret trends.
 
@@ -264,14 +290,14 @@ degraded
 - Nodes Total: 2 (Ready: 2, Unschedulable: 1)
 - Pods Total: 147 (Running: 147, Failed: 7, Pending: 0)
 
-### Node Health
-- vps01: **good**
-- app01: **elevated** (unschedulable)
-- internal: **good**
+### Per-Node Health
+Include ALL nodes with their detailed metrics and status:
+- nodename: CPU=XX.X%% → **status**, Memory=XX.X%% → **status**, Available=XXX.XGB, Pods=XX (Ready/Unschedulable/NotReady)
+- Example: app01: CPU=65.0%% → **elevated**, Memory=27.0%% → **good**, Available=3.0GB, Pods=7 (Unschedulable)
 
 ### Flagged Issues
-- pods_failed: 7 → **critical** (More than 5 failed pods)
-- nodes_unschedulable: 1 → **elevated** (At least 1 unschedulable node)
+- pods_failed: 7 → **critical** (Reason: failures concentrated on specific nodes or random distribution)
+- nodes_unschedulable: 1 → **elevated** (Node app01 - reason: high CPU/memory pressure or maintenance)
 
 Rules:
 - Only output markdown text
