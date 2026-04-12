@@ -10,7 +10,9 @@
       "Bash(helm upgrade:*)",
       "Bash(kubectl rollout:*)",
       "Bash(docker build:*)",
-      "Bash(docker push:*)"
+      "Bash(docker push:*)",
+      "Bash(cat C:/Users/bigoc/dev/health/.github/workflows/*.yml)",
+      "Bash(gh run:*)"
     ]
   }
 }

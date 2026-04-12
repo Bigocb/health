@@ -1,6 +1,7 @@
 package health
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -192,12 +193,12 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 	}
 
 	if r.llmClient != nil && r.llmClient.IsAvailable(ctx) {
-		metricsJSON, _ := json.Marshal(report.ClusterMetrics)
+		metricsText := r.formatMetricsAsText(report.ClusterMetrics)
 		smokeTestsJSON, _ := json.Marshal(report.SmokeTests)
 		podDetails := r.getPodDetails(ctx, report)
 
 		enhancedPrompt := r.llmClient.GenerateEnhancedPrompt(
-			string(metricsJSON),
+			metricsText,
 			fmt.Sprintf("%+v", result.Trends),
 			fmt.Sprintf("%+v", result.Anomalies),
 			string(smokeTestsJSON),
@@ -477,4 +478,75 @@ func (r *Reporter) generateRecommendations(report *types.Report) []string {
 	}
 
 	return recommendations
+}
+
+func (r *Reporter) formatMetricsAsText(metrics map[string]interface{}) string {
+	var buf bytes.Buffer
+	buf.WriteString("CLUSTER METRICS (Plain Text Format)\n")
+	buf.WriteString("====================================\n\n")
+
+	// Nodes
+	if nodes, ok := metrics["nodes"].(map[string]interface{}); ok {
+		buf.WriteString("NODES:\n")
+		if v, ok := nodes["total"].(float64); ok {
+			buf.WriteString(fmt.Sprintf("  Total nodes: %d\n", int(v)))
+		}
+		if v, ok := nodes["ready"].(float64); ok {
+			buf.WriteString(fmt.Sprintf("  Ready nodes: %d\n", int(v)))
+		}
+		if v, ok := nodes["not_ready"].(float64); ok {
+			buf.WriteString(fmt.Sprintf("  Not ready nodes: %d\n", int(v)))
+		}
+		if v, ok := nodes["unschedulable"].(float64); ok {
+			buf.WriteString(fmt.Sprintf("  Unschedulable nodes: %d\n", int(v)))
+		}
+		buf.WriteString("\n")
+	}
+
+	// Pods
+	if pods, ok := metrics["pods"].(map[string]interface{}); ok {
+		buf.WriteString("PODS:\n")
+		if v, ok := pods["total"].(float64); ok {
+			buf.WriteString(fmt.Sprintf("  Total pods: %d\n", int(v)))
+		}
+		if v, ok := pods["running"].(float64); ok {
+			buf.WriteString(fmt.Sprintf("  Running pods: %d\n", int(v)))
+		}
+		if v, ok := pods["pending"].(float64); ok {
+			buf.WriteString(fmt.Sprintf("  Pending pods: %d\n", int(v)))
+		}
+		if v, ok := pods["failed"].(float64); ok {
+			buf.WriteString(fmt.Sprintf("  Failed pods: %d\n", int(v)))
+		}
+		if v, ok := pods["succeeded"].(float64); ok {
+			buf.WriteString(fmt.Sprintf("  Succeeded pods: %d\n", int(v)))
+		}
+		if v, ok := pods["restarts"].(float64); ok {
+			buf.WriteString(fmt.Sprintf("  Pod restarts (1h): %d\n", int(v)))
+		}
+		buf.WriteString("\n")
+	}
+
+	// Resources
+	if resources, ok := metrics["resources"].(map[string]interface{}); ok {
+		buf.WriteString("RESOURCES:\n")
+		if v, ok := resources["cpu_usage_percent"].(float64); ok {
+			buf.WriteString(fmt.Sprintf("  CPU usage: %.1f%%\n", v))
+		}
+		if v, ok := resources["memory_usage_percent"].(float64); ok {
+			buf.WriteString(fmt.Sprintf("  Memory usage: %.1f%%\n", v))
+		}
+		if v, ok := resources["disk_usage_percent"].(float64); ok {
+			buf.WriteString(fmt.Sprintf("  Disk usage: %.1f%%\n", v))
+		}
+		if v, ok := resources["available_memory_gb"].(float64); ok {
+			buf.WriteString(fmt.Sprintf("  Available memory: %.0f GB\n", v))
+		}
+		if v, ok := resources["available_storage_gb"].(float64); ok {
+			buf.WriteString(fmt.Sprintf("  Available storage: %.0f GB\n", v))
+		}
+		buf.WriteString("\n")
+	}
+
+	return buf.String()
 }
