@@ -178,6 +178,21 @@ func runReport(reporter *health.Reporter) error {
 		}
 	}
 
+	// Save analysis to report before sending (so it's saved to disk)
+	if analysis != nil {
+		report.Analysis = map[string]interface{}{
+			"health_summary":   analysis.HealthSummary,
+			"confidence_score": analysis.ConfidenceScore,
+			"trends":           analysis.Trends,
+			"anomalies":        analysis.Anomalies,
+			"predictions":      analysis.Predictions,
+		}
+		// Update the saved report with analysis
+		if err := reporter.SaveReportWithAnalysis(ctx, report); err != nil {
+			log.Printf("failed to save report with analysis: %v", err)
+		}
+	}
+
 	if err := reporter.SendReportWithAnalysis(ctx, report, analysis); err != nil {
 		return fmt.Errorf("failed to send report: %w", err)
 	}

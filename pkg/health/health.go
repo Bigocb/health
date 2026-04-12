@@ -220,6 +220,13 @@ func (r *Reporter) SendReport(ctx context.Context, report *types.Report) error {
 	return r.sender.Send(ctx, report)
 }
 
+func (r *Reporter) SaveReportWithAnalysis(ctx context.Context, report *types.Report) error {
+	if r.historyMgr == nil {
+		return nil
+	}
+	return r.historyMgr.SaveReport(ctx, report)
+}
+
 func (r *Reporter) calculateStatus(metrics *mimir.Metrics) types.HealthStatus {
 	if metrics.Pods.Failed > 10 || metrics.Nodes.NotReady > 0 {
 		return types.StatusCritical
