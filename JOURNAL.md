@@ -259,5 +259,5 @@ spec:
 
 ---
 
-*Last updated: 2026-04-11*
-*Version: v0.5.0*
+*Last updated: 2026-04-12*
+*Version: v0.5.1*

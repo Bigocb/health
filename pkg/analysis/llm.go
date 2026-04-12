@@ -21,16 +21,24 @@ type LLMClient struct {
 }
 
 type LLMRequest struct {
-	Model       string  `json:"model"`
-	Prompt      string  `json:"prompt"`
-	System      string  `json:"system,omitempty"`
-	Stream      bool    `json:"stream"`
-	MaxTokens   int     `json:"max_tokens"`
-	Temperature float64 `json:"temperature"`
+	Model       string    `json:"model"`
+	Messages    []Message `json:"messages"`
+	Stream      bool      `json:"stream"`
+	MaxTokens   int       `json:"max_tokens"`
+	Temperature float64   `json:"temperature"`
 }
 
-type LLMResponse struct {
-	Response string `json:"response"`
+type Message struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type ChatResponse struct {
+	Choices []Choice `json:"choices"`
+}
+
+type Choice struct {
+	Message Message `json:"message"`
 }
 
 func NewLLMClient(endpoint, model string, timeoutSeconds, maxRetries int) *LLMClient {
@@ -63,14 +71,16 @@ func (l *LLMClient) Analyze(ctx context.Context, prompt string) (string, error) 
 }
 
 func (l *LLMClient) callAPI(ctx context.Context, prompt string) (string, error) {
-	url := fmt.Sprintf("%s/api/generate", l.endpoint)
+	url := fmt.Sprintf("%s/api/chat", l.endpoint)
 
-	systemPrompt := "You are an expert Kubernetes cluster health analyst. Your responses should be detailed, data-driven, and include specific numbers from the metrics provided. Always format your response with clear sections and bullet points."
+	systemPrompt := "You are an expert Kubernetes cluster health analyst. Your responses should be detailed (at least 500 words), data-driven, and include specific numbers from the metrics provided. Always format your response with clear sections and bullet points. Do not give brief summaries."
 
 	reqBody := LLMRequest{
-		Model:       l.model,
-		Prompt:      prompt,
-		System:      systemPrompt,
+		Model: l.model,
+		Messages: []Message{
+			{Role: "system", Content: systemPrompt},
+			{Role: "user", Content: prompt},
+		},
 		Stream:      false,
 		MaxTokens:   4096,
 		Temperature: 0.7,
@@ -107,16 +117,20 @@ func (l *LLMClient) callAPI(ctx context.Context, prompt string) (string, error) 
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	var llmResp LLMResponse
+	var llmResp ChatResponse
 	if err := json.Unmarshal(bodyBytes, &llmResp); err != nil {
 		log.Printf("[LLM] Raw response: %.500s", string(bodyBytes))
 		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	// Debug: log response length
-	log.Printf("[LLM] Response received, length: %d chars, first 200 chars: %.200s", len(llmResp.Response), llmResp.Response)
+	if len(llmResp.Choices) == 0 {
+		return "", fmt.Errorf("no response choices from LLM")
+	}
 
-	return llmResp.Response, nil
+	response := llmResp.Choices[0].Message.Content
+	log.Printf("[LLM] Response received, length: %d chars, first 200 chars: %.200s", len(response), response)
+
+	return response, nil
 }
 
 func (l *LLMClient) GenerateAnalysisPrompt(currentReport string, trends string, anomalies string) string {
