@@ -8,6 +8,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -214,7 +216,7 @@ func (l *LLMClient) GenerateDataAnalysisPrompt(metrics string, trends string) st
 - Memory Usage: Good <75%%, Elevated 75-90%%, Critical >90%%
 - Disk Usage: Good <80%%, Elevated 80-95%%, Critical >95%%
 - Unschedulable Nodes: Any count >0 is elevated
-- Failed Pods: Any count >0 is elevated
+- Failed Pods: 0=good, 1-5=elevated, 6+=critical
 
 ## Provided Cluster Metrics
 %s
@@ -222,69 +224,50 @@ func (l *LLMClient) GenerateDataAnalysisPrompt(metrics string, trends string) st
 ## Recent Trends
 %s
 
-## Your Task: Classify Each Metric - USE EXACT THRESHOLDS ONLY
+## Your Task: Classify Each Metric Using EXACT THRESHOLDS
 CRITICAL: Apply these EXACT thresholds. Do not deviate. Do not interpret trends.
 
-**MEMORY_USAGE_PERCENT**
-- If value is LESS THAN 75: status = "good"
-- If value is 75 OR MORE and LESS THAN 90: status = "elevated"
-- If value is 90 OR MORE: status = "critical"
-- Examples: 25% = GOOD, 75% = elevated, 90% = critical
+**Memory Usage Classification:**
+- If value < 75: status = good
+- If value >= 75 and < 90: status = elevated
+- If value >= 90: status = critical
+- Example: 27%% = good, 75%% = elevated, 90%% = critical
 
-**CPU_USAGE_PERCENT**
-- If value is LESS THAN 70: status = "good"
-- If value is 70 OR MORE and LESS THAN 85: status = "elevated"
-- If value is 85 OR MORE: status = "critical"
-- Examples: 50% = GOOD, 70% = elevated, 85% = critical
+**CPU Usage Classification:**
+- If value < 70: status = good
+- If value >= 70 and < 85: status = elevated
+- If value >= 85: status = critical
+- Example: 50%% = good, 70%% = elevated, 85%% = critical
 
-**DISK_USAGE_PERCENT**
-- If value is LESS THAN 80: status = "good"
-- If value is 80 OR MORE and LESS THAN 95: status = "elevated"
-- If value is 95 OR MORE: status = "critical"
-- Examples: 45% = GOOD, 80% = elevated, 95% = critical
+**Disk Usage Classification:**
+- If value < 80: status = good
+- If value >= 80 and < 95: status = elevated
+- If value >= 95: status = critical
+- Example: 45%% = good, 80%% = elevated, 95%% = critical
 
-**FAILED_PODS**
-- If count is 0: status = "good"
-- If count is 1-5: status = "elevated"
-- If count is 6+: status = "critical"
+## Response Format (Markdown - no JSON)
 
-Only include metrics in flagged_issues if status is "elevated" or "critical".
+### Overall Health
+[healthy|degraded|critical]
 
-Respond with ONLY valid JSON (no markdown, no commentary):
-{
-  "overall_health": "healthy|degraded|critical",
-  "metrics_summary": {
-    "cpu_usage_percent": {"value": <number>, "status": "good|elevated|critical"},
-    "memory_usage_percent": {"value": <number>, "status": "good|elevated|critical"},
-    "disk_usage_percent": {"value": <number>, "status": "good|elevated|critical"},
-    "available_memory_gb": {"value": <number>},
-    "available_storage_gb": {"value": <number>},
-    "nodes_total": {"value": <number>},
-    "nodes_ready": {"value": <number>},
-    "nodes_unschedulable": {"value": <number>, "status": "good|elevated|critical"},
-    "pods_total": {"value": <number>},
-    "pods_running": {"value": <number>},
-    "pods_failed": {"value": <number>, "status": "good|elevated|critical"},
-    "pods_pending": {"value": <number>, "status": "good|elevated|critical"}
-  },
-  "node_health": [
-    {
-      "name": "node-name",
-      "status": "good|elevated|critical",
-      "reason": "brief reason if not good"
-    }
-  ],
-  "flagged_issues": [
-    {
-      "metric": "metric_name",
-      "value": <number>,
-      "severity": "elevated|critical",
-      "description": "brief description"
-    }
-  ]
-}
+### Metrics Summary
+- CPU Usage: {value}%% → **{status}**
+- Memory Usage: {value}%% → **{status}**
+- Disk Usage: {value}%% → **{status}**
+- Available Memory: {value} GB
+- Available Storage: {value} GB
+- Nodes Total: {value} (Ready: {value}, Unschedulable: {value})
+- Pods Total: {value} (Running: {value}, Failed: {value}, Pending: {value})
 
-Only include flagged_issues if status is elevated or critical. Only include node_health if there are nodes. Return valid JSON only.`, metrics, trends)
+### Node Health
+- node-name: **{status}** {optional reason}
+
+### Flagged Issues (elevated or critical only)
+- metric_name: {value} → **{severity}** (description)
+
+Only include node_health section if there are nodes.
+Only include flagged_issues if there are elevated or critical items.
+Use exactly the format shown above.`, metrics, trends)
 }
 
 // GenerateNarrativePrompt creates a prompt for Phase 2: narrative generation based on structured analysis
@@ -352,279 +335,112 @@ func (l *LLMClient) IsAvailable(ctx context.Context) bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-// ValidatePhase1Response applies server-side threshold enforcement to Phase 1 LLM output
+// ValidatePhase1Response applies server-side threshold enforcement to Phase 1 LLM output (markdown format)
 // This corrects any misclassifications by the LLM and ensures strict threshold rules are applied
-func ValidatePhase1Response(jsonStr string) string {
-	log.Printf("[VALIDATOR] Starting validation of Phase 1 response (length: %d chars)", len(jsonStr))
+func ValidatePhase1Response(markdownStr string) string {
+	log.Printf("[VALIDATOR] Starting validation of Phase 1 response (length: %d chars)", len(markdownStr))
 	thresholds := DefaultThresholds()
 
-	// Extract first valid JSON object from the response (LLM may return multiple blocks)
-	cleanedStr := extractFirstJSON(jsonStr)
-	if cleanedStr == "" {
-		log.Printf("[VALIDATOR] Could not extract valid JSON from response")
-		return jsonStr
-	}
-
-	var response struct {
-		OverallHealth   string `json:"overall_health"`
-		MetricsSummary  map[string]interface{} `json:"metrics_summary"`
-		NodeHealth      []map[string]interface{} `json:"node_health"`
-		FlaggedIssues   []map[string]interface{} `json:"flagged_issues"`
-	}
-
-	if err := json.Unmarshal([]byte(cleanedStr), &response); err != nil {
-		log.Printf("[VALIDATOR] Failed to parse Phase 1 response: %v", err)
-		return jsonStr // Return unchanged if parse fails
-	}
-
-	// Apply threshold corrections to metrics_summary
-	if response.MetricsSummary != nil {
-		metricsToCorrect := []struct {
-			key       string
-			valueKey  string
-			threshold ResourceThreshold
-		}{
-			{"cpu_usage_percent", "cpu_usage_percent", thresholds.CPU},
-			{"memory_usage_percent", "memory_usage_percent", thresholds.Memory},
-			{"disk_usage_percent", "disk_usage_percent", thresholds.Disk},
-		}
-
-		for _, m := range metricsToCorrect {
-			if metricData, ok := response.MetricsSummary[m.key].(map[string]interface{}); ok {
-				if value, ok := metricData["value"].(float64); ok {
-					correctStatus := m.threshold.EvaluateStatus(value)
-					oldStatus := ""
-					if status, ok := metricData["status"].(string); ok {
-						oldStatus = status
-					}
-					metricData["status"] = correctStatus
-					if oldStatus != correctStatus {
-						log.Printf("[VALIDATOR] %s: %.1f%% - corrected status from '%s' to '%s'", m.key, value, oldStatus, correctStatus)
-					}
-				}
-			}
-		}
-
-		// Correct failed_pods status (0=good, 1-5=elevated, 6+=critical)
-		if podsFailedData, ok := response.MetricsSummary["pods_failed"].(map[string]interface{}); ok {
-			if value, ok := podsFailedData["value"].(float64); ok {
-				var correctStatus string
-				if value == 0 {
-					correctStatus = "good"
-				} else if value <= 5 {
-					correctStatus = "elevated"
-				} else {
-					correctStatus = "critical"
-				}
-				oldStatus := ""
-				if status, ok := podsFailedData["status"].(string); ok {
-					oldStatus = status
-				}
-				podsFailedData["status"] = correctStatus
-				if oldStatus != correctStatus {
-					log.Printf("[VALIDATOR] pods_failed: %.0f - corrected status from '%s' to '%s'", value, oldStatus, correctStatus)
-				}
-			}
-		}
-
-		// Correct pending_pods status (same as failed_pods)
-		if podsPendingData, ok := response.MetricsSummary["pods_pending"].(map[string]interface{}); ok {
-			if value, ok := podsPendingData["value"].(float64); ok {
-				var correctStatus string
-				if value == 0 {
-					correctStatus = "good"
-				} else if value <= 5 {
-					correctStatus = "elevated"
-				} else {
-					correctStatus = "critical"
-				}
-				oldStatus := ""
-				if status, ok := podsPendingData["status"].(string); ok {
-					oldStatus = status
-				}
-				podsPendingData["status"] = correctStatus
-				if oldStatus != correctStatus {
-					log.Printf("[VALIDATOR] pods_pending: %.0f - corrected status from '%s' to '%s'", value, oldStatus, correctStatus)
-				}
-			}
-		}
-
-		// Correct unschedulable_nodes status (0=good, >0=elevated)
-		if nodesUnschedulableData, ok := response.MetricsSummary["nodes_unschedulable"].(map[string]interface{}); ok {
-			if value, ok := nodesUnschedulableData["value"].(float64); ok {
-				var correctStatus string
-				if value == 0 {
-					correctStatus = "good"
-				} else {
-					correctStatus = "elevated"
-				}
-				oldStatus := ""
-				if status, ok := nodesUnschedulableData["status"].(string); ok {
-					oldStatus = status
-				}
-				nodesUnschedulableData["status"] = correctStatus
-				if oldStatus != correctStatus {
-					log.Printf("[VALIDATOR] nodes_unschedulable: %.0f - corrected status from '%s' to '%s'", value, oldStatus, correctStatus)
-				}
-			}
-		}
-	}
-
-	// Re-marshal to JSON
-	correctedBytes, err := json.Marshal(response)
-	if err != nil {
-		log.Printf("[VALIDATOR] Failed to re-marshal corrected response: %v", err)
-		return jsonStr
-	}
-
-	log.Printf("[VALIDATOR] Phase 1 response validated and corrected")
-	return string(correctedBytes)
+	return correctMarkdownStatuses(markdownStr, thresholds)
 }
 
-// extractFirstJSON finds and extracts the first valid JSON object from text (handles markdown and multiple blocks)
-func extractFirstJSON(text string) string {
-	// Find first markdown code fence if present
-	text = strings.TrimSpace(text)
 
-	// Try to find and extract markdown-wrapped JSON
-	if idx := strings.Index(text, "```"); idx != -1 {
-		// Found markdown fence, extract content between fences
-		startIdx := idx + 3
-		// Skip optional 'json' language marker
-		if strings.HasPrefix(text[startIdx:], "json") {
-			startIdx += 4
-		}
-		// Find closing fence
-		if endIdx := strings.Index(text[startIdx:], "```"); endIdx != -1 {
-			text = text[startIdx : startIdx+endIdx]
-		}
+// correctMarkdownStatuses finds metric statuses in markdown and corrects them using thresholds
+func correctMarkdownStatuses(markdown string, thresholds HealthThresholds) string {
+	result := markdown
+	correctedCount := 0
+
+	// Pattern: "Metric Name: {value}% → **{status}**"
+	// Find all metric lines and correct the status
+
+	// CPU Usage line
+	result, corrected := correctMetricStatus(result, "CPU Usage:", "(%", "→ \\*\\*([a-z]+)\\*\\*", func(value float64) string {
+		return thresholds.CPU.EvaluateStatus(value)
+	})
+	if corrected {
+		correctedCount++
 	}
 
-	text = strings.TrimSpace(text)
-
-	// Try to find all potential JSON objects and return the first valid one
-	candidates := findAllJSONObjects(text)
-	for _, candidate := range candidates {
-		// Sanitize and try to parse
-		sanitized := sanitizeJSON(candidate)
-		var test interface{}
-		if err := json.Unmarshal([]byte(sanitized), &test); err == nil {
-			return sanitized
-		}
+	// Memory Usage line
+	result, corrected = correctMetricStatus(result, "Memory Usage:", "(%", "→ \\*\\*([a-z]+)\\*\\*", func(value float64) string {
+		return thresholds.Memory.EvaluateStatus(value)
+	})
+	if corrected {
+		correctedCount++
 	}
 
-	return ""
+	// Disk Usage line
+	result, corrected = correctMetricStatus(result, "Disk Usage:", "(%", "→ \\*\\*([a-z]+)\\*\\*", func(value float64) string {
+		return thresholds.Disk.EvaluateStatus(value)
+	})
+	if corrected {
+		correctedCount++
+	}
+
+	// Failed Pods line (0=good, 1-5=elevated, 6+=critical)
+	result, corrected = correctMetricStatus(result, "Failed:", "", "→ \\*\\*([a-z]+)\\*\\*", func(value float64) string {
+		if value == 0 {
+			return "good"
+		} else if value <= 5 {
+			return "elevated"
+		}
+		return "critical"
+	})
+	if corrected {
+		correctedCount++
+	}
+
+	if correctedCount > 0 {
+		log.Printf("[VALIDATOR] Corrected %d metric statuses in markdown", correctedCount)
+	}
+	return result
 }
 
-// findAllJSONObjects extracts all potential JSON objects from text
-func findAllJSONObjects(text string) []string {
-	var candidates []string
+// correctMetricStatus finds a metric line, extracts value, applies threshold, and corrects status
+func correctMetricStatus(text, metricLabel, valueSuffix, statusPattern string, evaluateFunc func(float64) string) (string, bool) {
+	// Find the line containing the metric
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		if strings.Contains(line, metricLabel) {
+			// Extract the numeric value from this line
+			// Pattern: "Metric Name: {value}{suffix}"
+			idx := strings.Index(line, metricLabel)
+			if idx == -1 {
+				continue
+			}
+			afterLabel := line[idx+len(metricLabel):]
 
-	// Find all occurrences of '{' and try to find matching '}'
-	searchText := text
-	offset := 0
-
-	for {
-		braceIdx := strings.IndexByte(searchText, '{')
-		if braceIdx == -1 {
-			break
-		}
-
-		startIdx := offset + braceIdx
-		remaining := text[startIdx:]
-
-		// Try to find matching closing brace
-		braceCount := 0
-		inString := false
-		escaped := false
-		endIdx := -1
-
-		for i, ch := range remaining {
-			if escaped {
-				escaped = false
+			// Find the number before the suffix
+			parts := strings.Fields(afterLabel)
+			if len(parts) == 0 {
 				continue
 			}
 
-			if ch == '\\' && inString {
-				escaped = true
+			valueStr := strings.TrimSpace(parts[0])
+			valueStr = strings.TrimSuffix(valueStr, valueSuffix)
+
+			value, err := strconv.ParseFloat(valueStr, 64)
+			if err != nil {
 				continue
 			}
 
-			if ch == '"' {
-				inString = !inString
-				continue
-			}
+			// Get the correct status
+			correctStatus := evaluateFunc(value)
 
-			if !inString {
-				if ch == '{' {
-					braceCount++
-				} else if ch == '}' {
-					braceCount--
-					if braceCount == 0 {
-						endIdx = i
-						break
-					}
+			// Replace the old status with the correct one in this line
+			// Find pattern "→ **old_status**" and replace with "→ **correct_status**"
+			re := regexp.MustCompile(`→\s*\*\*([a-z]+)\*\*`)
+			matches := re.FindStringSubmatchIndex(line)
+			if matches != nil {
+				oldStatus := line[matches[2]:matches[3]]
+				if oldStatus != correctStatus {
+					line = re.ReplaceAllString(line, fmt.Sprintf("→ **%s**", correctStatus))
+					lines[i] = line
+					log.Printf("[VALIDATOR] %s: %.1f - corrected from '%s' to '%s'", metricLabel, value, oldStatus, correctStatus)
+					return strings.Join(lines, "\n"), true
 				}
 			}
 		}
-
-		if endIdx != -1 {
-			candidate := remaining[:endIdx+1]
-			candidates = append(candidates, candidate)
-			// Move search position past this candidate
-			offset = startIdx + endIdx + 1
-			searchText = text[offset:]
-		} else {
-			// No matching brace found, move past this opening brace
-			offset = startIdx + 1
-			searchText = text[offset:]
-		}
 	}
-
-	return candidates
-}
-
-// sanitizeJSON fixes common JSON issues like unescaped newlines in string values
-func sanitizeJSON(text string) string {
-	// Replace actual newlines and tabs within quoted strings with escaped versions
-	// This is a simple fix for LLM-generated JSON with literal whitespace in strings
-	var result strings.Builder
-	inString := false
-	escaped := false
-
-	for _, ch := range text {
-		if escaped {
-			result.WriteRune(ch)
-			escaped = false
-			continue
-		}
-
-		if ch == '\\' && inString {
-			result.WriteRune(ch)
-			escaped = true
-			continue
-		}
-
-		if ch == '"' {
-			result.WriteRune(ch)
-			inString = !inString
-			continue
-		}
-
-		if inString && (ch == '\n' || ch == '\r') {
-			// Skip literal newlines/carriage returns in strings
-			// (they're invalid JSON)
-			continue
-		}
-
-		if inString && ch == '\t' {
-			// Replace tabs with spaces in strings
-			result.WriteRune(' ')
-			continue
-		}
-
-		result.WriteRune(ch)
-	}
-
-	return result.String()
+	return text, false
 }
