@@ -482,70 +482,66 @@ func (r *Reporter) generateRecommendations(report *types.Report) []string {
 
 func (r *Reporter) formatMetricsAsText(metrics map[string]interface{}) string {
 	var buf bytes.Buffer
-	buf.WriteString("CLUSTER METRICS (Plain Text Format)\n")
-	buf.WriteString("====================================\n\n")
+	buf.WriteString("cluster_metrics:\n")
 
 	// Nodes
 	if nodes, ok := metrics["nodes"].(map[string]interface{}); ok {
-		buf.WriteString("NODES:\n")
+		buf.WriteString("  nodes:\n")
 		if v, ok := nodes["total"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("  Total nodes: %d\n", int(v)))
+			buf.WriteString(fmt.Sprintf("    total: %d\n", int(v)))
 		}
 		if v, ok := nodes["ready"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("  Ready nodes: %d\n", int(v)))
+			buf.WriteString(fmt.Sprintf("    ready: %d\n", int(v)))
 		}
 		if v, ok := nodes["not_ready"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("  Not ready nodes: %d\n", int(v)))
+			buf.WriteString(fmt.Sprintf("    not_ready: %d\n", int(v)))
 		}
 		if v, ok := nodes["unschedulable"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("  Unschedulable nodes: %d\n", int(v)))
+			buf.WriteString(fmt.Sprintf("    unschedulable: %d\n", int(v)))
 		}
-		buf.WriteString("\n")
 	}
 
 	// Pods
 	if pods, ok := metrics["pods"].(map[string]interface{}); ok {
-		buf.WriteString("PODS:\n")
+		buf.WriteString("  pods:\n")
 		if v, ok := pods["total"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("  Total pods: %d\n", int(v)))
+			buf.WriteString(fmt.Sprintf("    total: %d\n", int(v)))
 		}
 		if v, ok := pods["running"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("  Running pods: %d\n", int(v)))
+			buf.WriteString(fmt.Sprintf("    running: %d\n", int(v)))
 		}
 		if v, ok := pods["pending"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("  Pending pods: %d\n", int(v)))
+			buf.WriteString(fmt.Sprintf("    pending: %d\n", int(v)))
 		}
 		if v, ok := pods["failed"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("  Failed pods: %d\n", int(v)))
+			buf.WriteString(fmt.Sprintf("    failed: %d\n", int(v)))
 		}
 		if v, ok := pods["succeeded"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("  Succeeded pods: %d\n", int(v)))
+			buf.WriteString(fmt.Sprintf("    succeeded: %d\n", int(v)))
 		}
 		if v, ok := pods["restarts"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("  Pod restarts (1h): %d\n", int(v)))
+			buf.WriteString(fmt.Sprintf("    restarts_1h: %d\n", int(v)))
 		}
-		buf.WriteString("\n")
 	}
 
 	// Resources
 	if resources, ok := metrics["resources"].(map[string]interface{}); ok {
-		buf.WriteString("RESOURCES:\n")
+		buf.WriteString("  resources:\n")
 		if v, ok := resources["cpu_usage_percent"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("  CPU usage: %.1f%%\n", v))
+			buf.WriteString(fmt.Sprintf("    cpu_usage_percent: %.1f\n", v))
 		}
 		if v, ok := resources["memory_usage_percent"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("  Memory usage: %.1f%%\n", v))
+			buf.WriteString(fmt.Sprintf("    memory_usage_percent: %.1f\n", v))
 		}
 		if v, ok := resources["disk_usage_percent"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("  Disk usage: %.1f%%\n", v))
+			buf.WriteString(fmt.Sprintf("    disk_usage_percent: %.1f\n", v))
 		}
 		if v, ok := resources["available_memory_gb"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("  Available memory: %.0f GB\n", v))
+			buf.WriteString(fmt.Sprintf("    available_memory_gb: %.0f\n", v))
 		}
 		if v, ok := resources["available_storage_gb"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("  Available storage: %.0f GB\n", v))
+			buf.WriteString(fmt.Sprintf("    available_storage_gb: %.0f\n", v))
 		}
-		buf.WriteString("\n")
 	}
 
 	return buf.String()
