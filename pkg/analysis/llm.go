@@ -100,7 +100,7 @@ func (l *LLMClient) callAPI(ctx context.Context, prompt string) (string, error) 
 }
 
 func (l *LLMClient) GenerateAnalysisPrompt(currentReport string, trends string, anomalies string) string {
-	return fmt.Sprintf(`You are a Kubernetes cluster health analyst. Analyze the provided metrics and trends.
+	return fmt.Sprintf(`You are a Kubernetes cluster health analyst and DevOps expert.
 
 ## Current Cluster Status
 %s
@@ -111,14 +111,60 @@ func (l *LLMClient) GenerateAnalysisPrompt(currentReport string, trends string, 
 ## Identified Anomalies
 %s
 
-## Your Analysis Should Include:
-1. **Root Cause Analysis**: Why are these issues happening?
-2. **Trend Implications**: What do the trends suggest?
-3. **Risk Assessment**: What risks does this pose?
-4. **Actionable Steps**: Specific kubectl commands or configuration changes
-5. **Preventive Measures**: How to prevent recurrence?
+Generate a brief health summary.`, currentReport, trends, anomalies)
+}
 
-Provide analysis in JSON format with fields: root_causes, risk_assessment, immediate_actions, preventive_measures`, currentReport, trends, anomalies)
+func (l *LLMClient) GenerateEnhancedPrompt(metrics, trends, anomalies, smokeTests, status string) string {
+	return fmt.Sprintf(`You are a Kubernetes cluster health analyst and DevOps expert. Generate a comprehensive health report.
+
+## Cluster Metrics (JSON)
+%s
+
+## Trends (JSON)
+%s
+
+## Anomalies (JSON)
+%s
+
+## Smoke Test Results (JSON)
+%s
+
+## Overall Status: %s
+
+## Your Task
+Generate a comprehensive cluster health report in markdown format. Include:
+
+### 🎯 Executive Summary
+2-3 sentences overview.
+
+### 📊 Health Score
+EXCELLENT / GOOD / DEGRADED / CRITICAL
+
+### 📈 Key Metrics
+- Nodes (ready/total/unschedulable)
+- Pods (running/pending/failed/restarts)
+- CPU, Memory, Disk usage
+- Deployments (ready/unready)
+- Jobs (active/failed/succeeded)
+- Services (total/clusterIP/loadbalancer)
+- Storage PVCs (bound/pending/lost)
+
+### 🔍 Issues Found
+List with severity badge.
+
+### ✅ Smoke Tests
+Pass/fail summary by type.
+
+### 📉 Trends
+Any significant changes.
+
+### 💡 Recommendations
+3-5 prioritized actions.
+
+### ⚠️ Risk Outlook
+24-48 hour prediction.
+
+Format: Clean emoji-rich markdown for Discord.`, metrics, trends, anomalies, smokeTests, status)
 }
 
 func (l *LLMClient) IsAvailable(ctx context.Context) bool {

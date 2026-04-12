@@ -1,0 +1,144 @@
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: kubernetes-api
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: http
+spec:
+  type: http
+  enabled: true
+  severity: critical
+  timeout: "10s"
+  interval: "1m"
+  url: "https://kubernetes.default.svc:443/healthz"
+  expectedStatus: 200
+  tlsInsecure: true
+
+---
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: kubelet-health
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: http
+spec:
+  type: http
+  enabled: true
+  severity: critical
+  timeout: "5s"
+  interval: "2m"
+  url: "https://localhost:10250/healthz"
+  expectedStatus: 200
+  tlsInsecure: true
+
+---
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: coredns-external
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: dns
+spec:
+  type: dns
+  enabled: true
+  severity: high
+  timeout: "5s"
+  interval: "2m"
+  domain: "google.com"
+
+---
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: grafana-health
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: http
+spec:
+  type: http
+  enabled: true
+  severity: high
+  timeout: "5s"
+  interval: "2m"
+  url: "http://grafana.monitoring.svc:3000/api/health"
+  expectedStatus: 200
+
+---
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: mimir-health
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: http
+spec:
+  type: http
+  enabled: true
+  severity: critical
+  timeout: "5s"
+  interval: "2m"
+  url: "http://mimir-nginx.monitoring.svc:80/prometheus Ready"
+  method: GET
+  expectedStatus: 200
+
+---
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: argocd-health
+  namespace: argocd
+  labels:
+    app: health-reporter
+    test-type: http
+spec:
+  type: http
+  enabled: true
+  severity: high
+  timeout: "5s"
+  interval: "2m"
+  url: "http://argocd-server.argocd.svc:8080/health"
+  expectedStatus: 200
+
+---
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: minio-health
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: http
+spec:
+  type: http
+  enabled: false
+  severity: medium
+  timeout: "5s"
+  interval: "5m"
+  url: "http://minio.monitoring.svc:9000/minio/health/live"
+  expectedStatus: 200
+
+---
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: ingress-nginx
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: http
+spec:
+  type: http
+  enabled: true
+  severity: high
+  timeout: "5s"
+  interval: "2m"
+  url: "http://ingress-nginx-controller.ingress-nginx.svc:10246/healthz"
+  expectedStatus: 200

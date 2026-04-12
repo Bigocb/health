@@ -238,21 +238,29 @@ func (d *DiscordSender) formatEmbed(report *types.Report) map[string]interface{}
 		})
 	}
 
-	// Add analysis section if available
+	// Add analysis section if available (now as additional insights, not main message)
 	if report.Analysis != nil {
-		if summary, ok := report.Analysis["health_summary"].(string); ok && summary != "" {
-			fields = append(fields, map[string]interface{}{
-				"name":   "AI Analysis",
-				"value":  summary,
-				"inline": false,
-			})
-		}
 		if confidence, ok := report.Analysis["confidence_score"].(float64); ok && confidence > 0 {
 			fields = append(fields, map[string]interface{}{
 				"name":   "Analysis Confidence",
 				"value":  fmt.Sprintf("%.0f%%", confidence*100),
 				"inline": true,
 			})
+		}
+		// Add trends info
+		if trends, ok := report.Analysis["trends"].(map[string]interface{}); ok && len(trends) > 0 {
+			trendsText := ""
+			for k, v := range trends {
+				if tr, ok := v.(map[string]interface{}); ok {
+					trendsText += fmt.Sprintf("• %s: %s\n", k, tr["direction"])
+				}
+			}
+			if trendsText != "" {
+				fields = append(fields, map[string]interface{}{
+					"name":  "📈 Trends",
+					"value": trendsText,
+				})
+			}
 		}
 	}
 
@@ -262,6 +270,13 @@ func (d *DiscordSender) formatEmbed(report *types.Report) map[string]interface{}
 		"color":       color,
 		"fields":      fields,
 		"timestamp":   report.Timestamp.Format(time.RFC3339),
+	}
+
+	// Replace description with AI-generated summary if available
+	if report.Analysis != nil {
+		if aiSummary, ok := report.Analysis["health_summary"].(string); ok && aiSummary != "" {
+			embed["description"] = aiSummary
+		}
 	}
 
 	// Send separate detailed notification for test failures

@@ -1,0 +1,70 @@
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: etcd-connectivity
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: tcp
+spec:
+  type: tcp
+  enabled: true
+  severity: critical
+  timeout: "5s"
+  interval: "2m"
+  host: "etcd.default.svc"
+  port: 2379
+
+---
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: scheduler-connectivity
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: tcp
+spec:
+  type: tcp
+  enabled: true
+  severity: critical
+  timeout: "3s"
+  interval: "3m"
+  host: "kube-scheduler.kube-system.svc"
+  port: 10259
+
+---
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: controller-manager-connectivity
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: tcp
+spec:
+  type: tcp
+  enabled: true
+  severity: critical
+  timeout: "3s"
+  interval: "3m"
+  host: "kube-controller-manager.kube-system.svc"
+  port: 10257
+
+---
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: kube-proxy-tcp
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: tcp
+spec:
+  type: tcp
+  enabled: false
+  severity: high
+  timeout: "3s"
+  interval: "5m"
+  host: "kube-proxy.kube-system.svc"
+  port: 10249

@@ -2,6 +2,7 @@ package health
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -77,23 +78,54 @@ func (r *Reporter) Generate(ctx context.Context) (*types.Report, error) {
 		Timestamp: time.Now().UTC(),
 		ClusterMetrics: map[string]interface{}{
 			"nodes": map[string]interface{}{
-				"total":     metrics.Nodes.Total,
-				"ready":     metrics.Nodes.Ready,
-				"not_ready": metrics.Nodes.NotReady,
+				"total":         metrics.Nodes.Total,
+				"ready":         metrics.Nodes.Ready,
+				"not_ready":     metrics.Nodes.NotReady,
+				"unschedulable": metrics.Nodes.Unschedulable,
+				"cpu_cores":     metrics.Nodes.CPUCores,
+				"memory_gb":     metrics.Nodes.MemoryGB,
 			},
 			"pods": map[string]interface{}{
-				"total":    metrics.Pods.Total,
-				"running":  metrics.Pods.Running,
-				"pending":  metrics.Pods.Pending,
-				"failed":   metrics.Pods.Failed,
-				"restarts": metrics.Pods.Restarts,
+				"total":         metrics.Pods.Total,
+				"running":       metrics.Pods.Running,
+				"pending":       metrics.Pods.Pending,
+				"failed":        metrics.Pods.Failed,
+				"succeeded":     metrics.Pods.Succeeded,
+				"restarts":      metrics.Pods.Restarts,
+				"unschedulable": metrics.Pods.Unschedulable,
 			},
 			"resources": map[string]interface{}{
-				"cpu_usage_percent":    metrics.Resources.CPUUsagePercent,
-				"memory_usage_percent": metrics.Resources.MemoryUsagePercent,
-				"disk_usage_percent":   metrics.Resources.DiskUsagePercent,
-				"available_memory_gb":  metrics.Resources.AvailableMemoryGB,
-				"available_storage_gb": metrics.Resources.AvailableStorageGB,
+				"cpu_usage_percent":     metrics.Resources.CPUUsagePercent,
+				"memory_usage_percent":  metrics.Resources.MemoryUsagePercent,
+				"disk_usage_percent":    metrics.Resources.DiskUsagePercent,
+				"available_memory_gb":   metrics.Resources.AvailableMemoryGB,
+				"available_storage_gb":  metrics.Resources.AvailableStorageGB,
+				"cpu_cores_allocatable": metrics.Resources.CPUCoresAllocatable,
+				"memory_gb_allocatable": metrics.Resources.MemoryGBAllocatable,
+			},
+			"deployments": map[string]interface{}{
+				"total":       metrics.Deployments.Total,
+				"ready":       metrics.Deployments.Ready,
+				"unready":     metrics.Deployments.Unready,
+				"unavailable": metrics.Deployments.Unavailable,
+			},
+			"jobs": map[string]interface{}{
+				"total":     metrics.Jobs.Total,
+				"active":    metrics.Jobs.Active,
+				"failed":    metrics.Jobs.Failed,
+				"succeeded": metrics.Jobs.Succeeded,
+			},
+			"services": map[string]interface{}{
+				"total":        metrics.Services.Total,
+				"cluster_ip":   metrics.Services.ClusterIP,
+				"headless":     metrics.Services.Headless,
+				"loadbalancer": metrics.Services.TypeLoadBalancer,
+			},
+			"storage": map[string]interface{}{
+				"total_pvcs":   metrics.Storage.TotalPVCs,
+				"bound_pvcs":   metrics.Storage.BoundPVCs,
+				"pending_pvcs": metrics.Storage.PendingPVCs,
+				"lost_pvcs":    metrics.Storage.LostPVCs,
 			},
 		},
 	}
@@ -143,13 +175,19 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 	result := r.analyzer.Analyze(ctx, report, historicalReports)
 
 	if r.llmClient != nil && r.llmClient.IsAvailable(ctx) {
-		prompt := r.llmClient.GenerateAnalysisPrompt(
-			report.Summary,
+		metricsJSON, _ := json.Marshal(report.ClusterMetrics)
+		smokeTestsJSON, _ := json.Marshal(report.SmokeTests)
+
+		enhancedPrompt := r.llmClient.GenerateEnhancedPrompt(
+			string(metricsJSON),
 			fmt.Sprintf("%+v", result.Trends),
 			fmt.Sprintf("%+v", result.Anomalies),
+			string(smokeTestsJSON),
+			string(report.Status),
 		)
-		if llmAnalysis, err := r.llmClient.Analyze(ctx, prompt); err == nil {
-			result.HealthSummary = llmAnalysis + "\n\n" + result.HealthSummary
+
+		if llmAnalysis, err := r.llmClient.Analyze(ctx, enhancedPrompt); err == nil {
+			result.HealthSummary = llmAnalysis
 		}
 	}
 

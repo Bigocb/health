@@ -18,32 +18,73 @@ type Client struct {
 
 // Metrics represents cluster metrics from Mimir
 type Metrics struct {
-	Timestamp time.Time
-	Nodes     NodeMetrics
-	Pods      PodMetrics
-	Resources ResourceMetrics
+	Timestamp   time.Time
+	Nodes       NodeMetrics
+	Pods        PodMetrics
+	Resources   ResourceMetrics
+	Deployments DeploymentMetrics
+	Jobs        JobMetrics
+	Services    ServiceMetrics
+	Storage     StorageMetrics
 }
 
 type NodeMetrics struct {
-	Total    int
-	Ready    int
-	NotReady int
+	Total         int
+	Ready         int
+	NotReady      int
+	CPUCores      int
+	MemoryGB      float64
+	Unschedulable int
 }
 
 type PodMetrics struct {
-	Total    int
-	Running  int
-	Pending  int
-	Failed   int
-	Restarts int // Last 1h
+	Total         int
+	Running       int
+	Pending       int
+	Failed        int
+	Succeeded     int
+	Restarts      int
+	Unschedulable int
 }
 
 type ResourceMetrics struct {
-	CPUUsagePercent    float64
-	MemoryUsagePercent float64
-	DiskUsagePercent   float64
-	AvailableMemoryGB  float64
-	AvailableStorageGB float64
+	CPUUsagePercent     float64
+	MemoryUsagePercent  float64
+	DiskUsagePercent    float64
+	AvailableMemoryGB   float64
+	AvailableStorageGB  float64
+	CPUCoresAllocatable float64
+	MemoryGBAllocatable float64
+}
+
+type DeploymentMetrics struct {
+	Total       int
+	Ready       int
+	Unready     int
+	Unavailable int
+}
+
+type JobMetrics struct {
+	Total     int
+	Active    int
+	Failed    int
+	Succeeded int
+}
+
+type ServiceMetrics struct {
+	Total            int
+	ClusterIP        int
+	Headless         int
+	TypeLoadBalancer int
+}
+
+type StorageMetrics struct {
+	TotalPVCs         int
+	BoundPVCs         int
+	PendingPVCs       int
+	LostPVCs          int
+	StorageUsedGB     float64
+	StorageCapacityGB float64
 }
 
 // NewClient creates a new Mimir client
@@ -87,15 +128,37 @@ func (c *Client) GetMetrics(ctx context.Context) (*Metrics, error) {
 		return nil, fmt.Errorf("failed to query resource metrics: %w", err)
 	}
 
+	// Query deployment metrics
+	if err := c.queryDeploymentMetrics(ctx, metrics); err != nil {
+		fmt.Printf("[WARN] failed to query deployment metrics: %v\n", err)
+	}
+
+	// Query job metrics
+	if err := c.queryJobMetrics(ctx, metrics); err != nil {
+		fmt.Printf("[WARN] failed to query job metrics: %v\n", err)
+	}
+
+	// Query service metrics
+	if err := c.queryServiceMetrics(ctx, metrics); err != nil {
+		fmt.Printf("[WARN] failed to query service metrics: %v\n", err)
+	}
+
+	// Query storage metrics
+	if err := c.queryStorageMetrics(ctx, metrics); err != nil {
+		fmt.Printf("[WARN] failed to query storage metrics: %v\n", err)
+	}
+
 	return metrics, nil
 }
 
 // queryNodeMetrics queries node status from Mimir
 func (c *Client) queryNodeMetrics(ctx context.Context, m *Metrics) error {
-	// Query: node status (ready, not ready)
 	queries := map[string]string{
-		"ready_nodes": `sum(kube_node_status_condition{condition="Ready",status="true"} unless on(node) kube_node_spec_unschedulable == 1)`,
-		"total_nodes": `count(kube_node_info unless on(node) kube_node_spec_unschedulable == 1)`,
+		"ready_nodes":   `sum(kube_node_status_condition{condition="Ready",status="true"} unless on(node) kube_node_spec_unschedulable == 1)`,
+		"total_nodes":   `count(kube_node_info unless on(node) kube_node_spec_unschedulable == 1)`,
+		"unschedulable": `count(kube_node_spec_unschedulable == 1)`,
+		"cpu_cores":     `sum(kube_node_status_allocatable{resource="cpu"})`,
+		"memory_bytes":  `sum(kube_node_status_allocatable{resource="memory"}) / 1024 / 1024 / 1024`,
 	}
 
 	results, err := c.queryRange(ctx, queries)
@@ -106,6 +169,9 @@ func (c *Client) queryNodeMetrics(ctx context.Context, m *Metrics) error {
 	m.Nodes.Ready = int(floatValue(results["ready_nodes"]))
 	m.Nodes.Total = int(floatValue(results["total_nodes"]))
 	m.Nodes.NotReady = m.Nodes.Total - m.Nodes.Ready
+	m.Nodes.Unschedulable = int(floatValue(results["unschedulable"]))
+	m.Nodes.CPUCores = int(floatValue(results["cpu_cores"]))
+	m.Nodes.MemoryGB = floatValue(results["memory_bytes"])
 
 	return nil
 }
@@ -115,8 +181,11 @@ func (c *Client) queryPodMetrics(ctx context.Context, m *Metrics) error {
 	queries := map[string]string{
 		"running_pods":   `count(kube_pod_status_phase{phase="Running"})`,
 		"total_pods":     `count(kube_pod_info)`,
-		"unhealthy_pods": `count(kube_pod_status_phase{phase!~"Running|Succeeded"} == 1)`,
+		"pending_pods":   `count(kube_pod_status_phase{phase="Pending"})`,
+		"failed_pods":    `count(kube_pod_status_phase{phase="Failed"})`,
+		"succeeded_pods": `count(kube_pod_status_phase{phase="Succeeded"})`,
 		"restarts_1h":    `sum(increase(kube_pod_container_status_restarts_total[1h]))`,
+		"unschedulable":  `count(kube_pod_status_phase{phase="Pending"} > 0 and kube_pod_condition{condition="PodScheduled",status="false"} > 0)`,
 	}
 
 	results, err := c.queryRange(ctx, queries)
@@ -126,9 +195,99 @@ func (c *Client) queryPodMetrics(ctx context.Context, m *Metrics) error {
 
 	m.Pods.Running = int(floatValue(results["running_pods"]))
 	m.Pods.Total = int(floatValue(results["total_pods"]))
-	m.Pods.Pending = 0 // Not separately tracked in shell script
-	m.Pods.Failed = int(floatValue(results["unhealthy_pods"]))
+	m.Pods.Pending = int(floatValue(results["pending_pods"]))
+	m.Pods.Failed = int(floatValue(results["failed_pods"]))
+	m.Pods.Succeeded = int(floatValue(results["succeeded_pods"]))
 	m.Pods.Restarts = int(floatValue(results["restarts_1h"]))
+	m.Pods.Unschedulable = int(floatValue(results["unschedulable"]))
+
+	return nil
+}
+
+// queryDeploymentMetrics queries deployment status from Mimir
+func (c *Client) queryDeploymentMetrics(ctx context.Context, m *Metrics) error {
+	queries := map[string]string{
+		"total_deployments":  `count(kube_deployment_labels)`,
+		"available_replicas": `sum(kube_deployment_status_replicas_available)`,
+		"desired_replicas":   `sum(kube_deployment_spec_replicas)`,
+		"unavailable":        `sum(kube_deployment_status_replicas_unavailable)`,
+	}
+
+	results, err := c.queryRange(ctx, queries)
+	if err != nil {
+		return err
+	}
+
+	m.Deployments.Total = int(floatValue(results["total_deployments"]))
+	m.Deployments.Ready = int(floatValue(results["available_replicas"]))
+	m.Deployments.Unready = int(floatValue(results["desired_replicas"])) - int(floatValue(results["available_replicas"]))
+	m.Deployments.Unavailable = int(floatValue(results["unavailable"]))
+
+	return nil
+}
+
+// queryJobMetrics queries job status from Mimir
+func (c *Client) queryJobMetrics(ctx context.Context, m *Metrics) error {
+	queries := map[string]string{
+		"total_jobs":     `count(kube_job_labels)`,
+		"active_jobs":    `count(kube_job_status_active == 1)`,
+		"failed_jobs":    `count(kube_job_status_failed > 0)`,
+		"succeeded_jobs": `count(kube_job_status_succeeded > 0)`,
+	}
+
+	results, err := c.queryRange(ctx, queries)
+	if err != nil {
+		return err
+	}
+
+	m.Jobs.Total = int(floatValue(results["total_jobs"]))
+	m.Jobs.Active = int(floatValue(results["active_jobs"]))
+	m.Jobs.Failed = int(floatValue(results["failed_jobs"]))
+	m.Jobs.Succeeded = int(floatValue(results["succeeded_jobs"]))
+
+	return nil
+}
+
+// queryServiceMetrics queries service status from Mimir
+func (c *Client) queryServiceMetrics(ctx context.Context, m *Metrics) error {
+	queries := map[string]string{
+		"total_services": `count(kube_service_labels)`,
+		"cluster_ip":     `count(kube_service_spec_type{type="ClusterIP"})`,
+		"headless":       `count(kube_service_spec_type{type="ClusterIP"} and kube_service_spec_cluster_ip == "")`,
+		"loadbalancer":   `count(kube_service_spec_type{type="LoadBalancer"})`,
+	}
+
+	results, err := c.queryRange(ctx, queries)
+	if err != nil {
+		return err
+	}
+
+	m.Services.Total = int(floatValue(results["total_services"]))
+	m.Services.ClusterIP = int(floatValue(results["cluster_ip"]))
+	m.Services.Headless = int(floatValue(results["headless"]))
+	m.Services.TypeLoadBalancer = int(floatValue(results["loadbalancer"]))
+
+	return nil
+}
+
+// queryStorageMetrics queries PVC status from Mimir
+func (c *Client) queryStorageMetrics(ctx context.Context, m *Metrics) error {
+	queries := map[string]string{
+		"total_pvcs":   `count(kube_persistentvolumeclaim_info)`,
+		"bound_pvcs":   `count(kube_persistentvolumeclaim_status_phase{phase="Bound"})`,
+		"pending_pvcs": `count(kube_persistentvolumeclaim_status_phase{phase="Pending"})`,
+		"lost_pvcs":    `count(kube_persistentvolumeclaim_status_phase{phase="Lost"})`,
+	}
+
+	results, err := c.queryRange(ctx, queries)
+	if err != nil {
+		return err
+	}
+
+	m.Storage.TotalPVCs = int(floatValue(results["total_pvcs"]))
+	m.Storage.BoundPVCs = int(floatValue(results["bound_pvcs"]))
+	m.Storage.PendingPVCs = int(floatValue(results["pending_pvcs"]))
+	m.Storage.LostPVCs = int(floatValue(results["lost_pvcs"]))
 
 	return nil
 }
