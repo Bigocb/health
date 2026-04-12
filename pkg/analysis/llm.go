@@ -125,7 +125,14 @@ func (l *LLMClient) GenerateEnhancedPrompt(metrics, trends, anomalies, smokeTest
 		podSection = fmt.Sprintf("\n## Pod Details\n%s", podDetails)
 	}
 
-	return fmt.Sprintf(`You are a Kubernetes cluster health analyst and DevOps expert. Generate a comprehensive health report.
+	return fmt.Sprintf(`You are a Kubernetes cluster health analyst and DevOps expert. Your task is to generate a VERY DETAILED and COMPREHENSIVE health report.
+
+## CRITICAL: Output Requirements
+- Write EXTENSIVE content for every section (minimum 150 words per section)
+- NEVER use placeholder text like "[details]" or "[provide...]"
+- ALWAYS include specific numbers and details from the data provided
+- Use bullet points and lists extensively
+- Make each section actionable and informative
 
 ## Cluster Metrics (JSON)
 %s
@@ -142,54 +149,87 @@ func (l *LLMClient) GenerateEnhancedPrompt(metrics, trends, anomalies, smokeTest
 ## Overall Status: %s
 %s%s
 
-## Your Task
-Generate a detailed cluster health report. Write at least 3-4 sentences for EACH section. Use this exact format:
+## Required Report Format
 
-### 🎯 Executive Summary
-[Detailed 3-4 sentence overview of cluster state]
+### 🎯 Executive Summary (MINIMUM 200 WORDS)
+Write a thorough 3-4 paragraph overview that includes:
+- Current cluster state summary
+- Key metrics (CPU, Memory, Pods, Nodes)
+- Primary concerns and their impact
+- Overall health assessment
 
-### 📊 Health Score
-[EXCELLENT/GOOD/DEGRADED/CRITICAL] - [one line justification]
+### 📊 Health Score (MINIMUM 100 WORDS)
+Provide:
+- Your determination: EXCELLENT / GOOD / DEGRADED / CRITICAL
+- Detailed justification with specific metrics
+- Comparison to previous trends if available
 
-### 📈 Key Metrics Breakdown
-- Nodes: [details]
-- Pods: [details with running/pending/failed counts]
-- CPU: [usage and context]
-- Memory: [usage and context]
-- Disk: [usage]
-- Deployments: [ready/total]
-- Jobs: [status breakdown]
-- Services: [counts]
-- PVCs: [status]
+### 📈 Key Metrics Breakdown (MINIMUM 300 WORDS)
+For EACH of the following, provide detailed numbers AND interpretation:
+- Nodes: Total, Ready, NotReady, Unschedulable, CPU cores, Memory
+- Pods: Running, Pending, Failed, Succeeded, Restarts (1h)
+- CPU: Usage percentage and whether it's healthy
+- Memory: Usage percentage and whether it's healthy
+- Disk: Usage percentage
+- Deployments: Ready vs Total, any unavailable
+- Jobs: Active, Failed, Succeeded counts
+- Services: ClusterIP, Headless, LoadBalancer counts
+- PVCs: Bound, Pending, Lost
 
-### 🚨 Issues & Alerts
-[List each issue with severity: high/medium/low and explanation - use log context to identify root causes]
+### 🚨 Issues & Alerts (MINIMUM 200 WORDS)
+List EVERY issue found with:
+- Specific severity (critical/high/medium/low)
+- Exact count of affected resources
+- Why this is a problem
+- Potential root cause
 
-### 🔴 Failed Pods
-[If there are failed pods, list their names and namespaces, and suggest diagnostic commands]
+### 🔴 Failed Pods (MINIMUM 150 WORDS)
+- List each failed pod name and namespace if available
+- Explain what "failed" means for this cluster
+- Provide specific kubectl commands to investigate:
+  - kubectl get pods -A --field-selector=status.phase=Failed
+  - kubectl describe pod <pod-name> -n <namespace>
+  - kubectl logs <pod-name> -n <namespace> --previous
 
-### ⏳ Pending Pods
-[If there are pending pods, list their names and namespaces, and suggest causes (resources, scheduling, etc.)]
+### ⏳ Pending Pods (MINIMUM 100 WORDS)
+- Count of pending pods
+- Common causes (resource constraints, scheduling, PVC issues)
+- Commands to investigate:
+  - kubectl get pods -A --field-selector=status.phase=Pending
 
-### ✅ Smoke Tests Summary
-[Pass/fail counts with any failures highlighted]
+### ✅ Smoke Tests Summary (MINIMUM 150 WORDS)
+- Total tests run, pass count, fail count
+- List each test that failed with error message
+- List each test that passed
+- Implications of any failures
 
-### 📉 Trend Analysis
-[What the trends show - increasing/decreasing/stable for each metric]
+### 📉 Trend Analysis (MINIMUM 150 WORDS)
+For EACH metric (CPU, Memory):
+- Direction: increasing/decreasing/stable
+- Percentage change
+- What this trend means for cluster health
 
-### 🛠️ Diagnostic Commands
-[Provide specific kubectl commands to investigate issues like:
+### 🛠️ Diagnostic Commands (MINIMUM 100 WORDS)
+Provide these exact commands users can run:
 - kubectl get pods -A --field-selector=status.phase=Failed
-- kubectl describe pod <pod-name> -n <namespace>
-- kubectl logs <pod-name> -n <namespace> --previous]
+- kubectl get pods -A --field-selector=status.phase=Pending
+- kubectl top nodes
+- kubectl top pods -A
+- kubectl describe node (node-name)
+- kubectl get events --sort-by='.lastTimestamp' | tail -50
 
-### 🔧 Recommendations
-Provide numbered list of 5 specific actions to improve cluster health
+### 🔧 Recommendations (MINIMUM 200 WORDS)
+Provide NUMBERED list of 5-10 specific actions with:
+- What to do
+- Why it matters
+- How to do it (command)
 
-### ⚠️ Risk Outlook
-[24-48 hour prediction based on trends]
+### ⚠️ Risk Outlook (MINIMUM 100 WORDS)
+- 24-48 hour prediction
+- What could go wrong
+- Early warning signs to watch for
 
-IMPORTANT: Write substantial content for each section. Do not use placeholder text.`, metrics, trends, anomalies, smokeTests, status, logSection, podSection)
+Now generate your detailed report:`, metrics, trends, anomalies, smokeTests, status, logSection, podSection)
 }
 
 func (l *LLMClient) IsAvailable(ctx context.Context) bool {
