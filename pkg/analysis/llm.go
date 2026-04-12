@@ -512,22 +512,91 @@ func extractFirstJSON(text string) string {
 
 	// Find matching closing brace for the first object
 	braceCount := 0
+	inString := false
+	escaped := false
+
 	for i, ch := range text {
-		if ch == '{' {
-			braceCount++
-		} else if ch == '}' {
-			braceCount--
-			if braceCount == 0 {
-				// Found matching closing brace
-				candidate := text[:i+1]
-				// Verify it's valid JSON
-				var test interface{}
-				if err := json.Unmarshal([]byte(candidate), &test); err == nil {
-					return candidate
+		if escaped {
+			escaped = false
+			continue
+		}
+
+		if ch == '\\' && inString {
+			escaped = true
+			continue
+		}
+
+		if ch == '"' {
+			inString = !inString
+			continue
+		}
+
+		if !inString {
+			if ch == '{' {
+				braceCount++
+			} else if ch == '}' {
+				braceCount--
+				if braceCount == 0 {
+					// Found matching closing brace
+					candidate := text[:i+1]
+
+					// Sanitize the JSON: fix unescaped newlines in strings
+					candidate = sanitizeJSON(candidate)
+
+					// Verify it's valid JSON
+					var test interface{}
+					if err := json.Unmarshal([]byte(candidate), &test); err == nil {
+						return candidate
+					}
 				}
 			}
 		}
 	}
 
 	return ""
+}
+
+// sanitizeJSON fixes common JSON issues like unescaped newlines in string values
+func sanitizeJSON(text string) string {
+	// Replace actual newlines and tabs within quoted strings with escaped versions
+	// This is a simple fix for LLM-generated JSON with literal whitespace in strings
+	var result strings.Builder
+	inString := false
+	escaped := false
+
+	for _, ch := range text {
+		if escaped {
+			result.WriteRune(ch)
+			escaped = false
+			continue
+		}
+
+		if ch == '\\' && inString {
+			result.WriteRune(ch)
+			escaped = true
+			continue
+		}
+
+		if ch == '"' {
+			result.WriteRune(ch)
+			inString = !inString
+			continue
+		}
+
+		if inString && (ch == '\n' || ch == '\r') {
+			// Skip literal newlines/carriage returns in strings
+			// (they're invalid JSON)
+			continue
+		}
+
+		if inString && ch == '\t' {
+			// Replace tabs with spaces in strings
+			result.WriteRune(' ')
+			continue
+		}
+
+		result.WriteRune(ch)
+	}
+
+	return result.String()
 }
