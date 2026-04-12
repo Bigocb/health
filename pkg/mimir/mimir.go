@@ -239,6 +239,10 @@ func (c *Client) queryNodeDetailsMetrics(ctx context.Context, m *Metrics) error 
 			detail.PodCount = int(podCount)
 		}
 
+		fmt.Printf("[DEBUG] Node %s: CPU=%.1f%%, Mem=%.1f%%, MemAvail=%.1fGB, Ready=%v, Unschedulable=%v, Pods=%d\n",
+			detail.Name, detail.CPUUsagePercent, detail.MemoryUsagePercent, detail.AvailableMemoryGB,
+			detail.Ready, detail.Unschedulable, detail.PodCount)
+
 		m.NodeDetails = append(m.NodeDetails, detail)
 	}
 
