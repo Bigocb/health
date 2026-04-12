@@ -208,6 +208,28 @@ func (d *DiscordSender) formatEmbed(report *types.Report) map[string]interface{}
 		}
 	}
 
+	// Add node resources section if available
+	if len(report.NodeMetrics) > 0 {
+		nodeTable := d.buildNodeTable(report.NodeMetrics)
+		if nodeTable != "" {
+			fields = append(fields, map[string]interface{}{
+				"name":  "Node Resources",
+				"value": nodeTable,
+			})
+		}
+	}
+
+	// Add affected pods section if available and issues flagged
+	if len(report.FailedPods) > 0 {
+		podsText := d.buildFailedPodsString(report.FailedPods)
+		if podsText != "" {
+			fields = append(fields, map[string]interface{}{
+				"name":  "Affected Pods",
+				"value": podsText,
+			})
+		}
+	}
+
 	// Add concerns section
 	if len(report.Concerns) > 0 {
 		concernsText := ""
@@ -289,6 +311,75 @@ func (d *DiscordSender) formatEmbed(report *types.Report) map[string]interface{}
 	}
 
 	return embed
+}
+
+// buildNodeTable formats node metrics as a markdown code block table
+func (d *DiscordSender) buildNodeTable(nodes []types.NodeMetrics) string {
+	if len(nodes) == 0 {
+		return ""
+	}
+
+	var buf bytes.Buffer
+	buf.WriteString("```\n")
+	buf.WriteString("Node          | Ready | CPU %  | Mem %  | Avail GB\n")
+	buf.WriteString("--------------|-------|--------|--------|----------\n")
+
+	for _, node := range nodes {
+		readyMark := "✓"
+		if !node.Ready {
+			readyMark = "✗"
+		}
+		if node.Unschedulable {
+			readyMark = "⊗"
+		}
+
+		// Truncate node name to fit formatting
+		nodeName := node.Name
+		if len(nodeName) > 13 {
+			nodeName = nodeName[:10] + ".."
+		}
+
+		buf.WriteString(fmt.Sprintf("%-13s | %s    | %6.1f | %6.1f | %8.1f\n",
+			nodeName, readyMark, node.CPUUsagePercent, node.MemoryUsagePercent, node.AvailableMemoryGB))
+	}
+	buf.WriteString("```")
+
+	return buf.String()
+}
+
+// buildFailedPodsString formats failed pods grouped by namespace
+func (d *DiscordSender) buildFailedPodsString(pods []types.FailedPod) string {
+	if len(pods) == 0 {
+		return ""
+	}
+
+	// Group pods by namespace
+	byNamespace := make(map[string][]types.FailedPod)
+	for _, pod := range pods {
+		byNamespace[pod.Namespace] = append(byNamespace[pod.Namespace], pod)
+	}
+
+	var buf bytes.Buffer
+	for namespace, nsPods := range byNamespace {
+		if buf.Len() > 0 {
+			buf.WriteString("\n")
+		}
+		buf.WriteString(fmt.Sprintf("• **%s**: ", namespace))
+
+		// List pods in this namespace (limit to 3 to stay under Discord field limits)
+		for i, pod := range nsPods {
+			if i > 0 {
+				buf.WriteString(", ")
+			}
+			if i >= 3 {
+				buf.WriteString(fmt.Sprintf("... and %d more", len(nsPods)-3))
+				break
+			}
+			buf.WriteString(fmt.Sprintf("%s (%s)", pod.Name, pod.Phase))
+		}
+	}
+
+	return buf.String()
 }
 
 // sendDetailedTestResults sends detailed smoke test results in a separate message

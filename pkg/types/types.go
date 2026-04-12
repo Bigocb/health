@@ -14,6 +14,27 @@ const (
 	StatusCritical HealthStatus = "critical"
 )
 
+// NodeMetrics represents per-node resource metrics
+type NodeMetrics struct {
+	Name              string  `json:"name"`
+	Ready             bool    `json:"ready"`
+	Unschedulable     bool    `json:"unschedulable"`
+	CPUUsagePercent   float64 `json:"cpu_usage_percent"`
+	MemoryUsagePercent float64 `json:"memory_usage_percent"`
+	AvailableMemoryGB float64 `json:"available_memory_gb"`
+	PodCount          int     `json:"pod_count"`
+}
+
+// FailedPod represents a failed pod with its details
+type FailedPod struct {
+	Namespace    string `json:"namespace"`
+	Name         string `json:"name"`
+	Phase        string `json:"phase"`
+	Reason       string `json:"reason"`
+	LastError    string `json:"last_error"`
+	RestartCount int    `json:"restart_count"`
+}
+
 // Report represents a health report
 type Report struct {
 	Timestamp       time.Time              `json:"timestamp"`
@@ -24,6 +45,8 @@ type Report struct {
 	Recommendations []string               `json:"recommendations,omitempty"`
 	SmokeTests      []SmokeTestResult      `json:"smoke_tests,omitempty"`
 	Analysis        map[string]interface{} `json:"analysis,omitempty"`
+	NodeMetrics     []NodeMetrics          `json:"node_metrics,omitempty"`
+	FailedPods      []FailedPod            `json:"failed_pods,omitempty"`
 }
 
 // SmokeTestResult represents the result of a smoke test

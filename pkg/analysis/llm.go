@@ -213,6 +213,7 @@ func (l *LLMClient) GenerateDataAnalysisPrompt(metrics string, trends string) st
 - Memory Usage: Good <75%%, Elevated 75-90%%, Critical >90%%
 - Disk Usage: Good <80%%, Elevated 80-95%%, Critical >95%%
 - Unschedulable Nodes: Any count >0 is elevated
+- Failed Pods: Any count >0 is elevated
 
 ## Provided Cluster Metrics
 %s
@@ -222,6 +223,7 @@ func (l *LLMClient) GenerateDataAnalysisPrompt(metrics string, trends string) st
 
 ## Your Task: Classify Each Metric
 For each metric, determine its status (good/elevated/critical) using the thresholds above.
+Also classify per-node health: mark nodes as critical if unschedulable, elevated if CPU >85%% OR Memory >90%%.
 
 Respond with ONLY valid JSON (no markdown, no commentary):
 {
@@ -240,6 +242,13 @@ Respond with ONLY valid JSON (no markdown, no commentary):
     "pods_failed": {"value": <number>, "status": "good|elevated|critical"},
     "pods_pending": {"value": <number>, "status": "good|elevated|critical"}
   },
+  "node_health": [
+    {
+      "name": "node-name",
+      "status": "good|elevated|critical",
+      "reason": "brief reason if not good"
+    }
+  ],
   "flagged_issues": [
     {
       "metric": "metric_name",
@@ -250,7 +259,7 @@ Respond with ONLY valid JSON (no markdown, no commentary):
   ]
 }
 
-Only include flagged_issues if status is elevated or critical. Return valid JSON only.`, metrics, trends)
+Only include flagged_issues if status is elevated or critical. Only include node_health if there are nodes. Return valid JSON only.`, metrics, trends)
 }
 
 // GenerateNarrativePrompt creates a prompt for Phase 2: narrative generation based on structured analysis

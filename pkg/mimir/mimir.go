@@ -26,6 +26,18 @@ type Metrics struct {
 	Jobs        JobMetrics
 	Services    ServiceMetrics
 	Storage     StorageMetrics
+	NodeDetails []NodeDetail  // NEW: per-node breakdown
+}
+
+// NodeDetail represents per-node metrics
+type NodeDetail struct {
+	Name               string
+	Ready              bool
+	Unschedulable      bool
+	CPUUsagePercent    float64
+	MemoryUsagePercent float64
+	AvailableMemoryGB  float64
+	PodCount           int
 }
 
 type NodeMetrics struct {
@@ -118,6 +130,11 @@ func (c *Client) GetMetrics(ctx context.Context) (*Metrics, error) {
 		return nil, fmt.Errorf("failed to query node metrics: %w", err)
 	}
 
+	// Query per-node detailed metrics
+	if err := c.queryNodeDetailsMetrics(ctx, metrics); err != nil {
+		fmt.Printf("[WARN] failed to query node details: %v\n", err)
+	}
+
 	// Query pod metrics
 	if err := c.queryPodMetrics(ctx, metrics); err != nil {
 		return nil, fmt.Errorf("failed to query pod metrics: %w", err)
@@ -174,6 +191,115 @@ func (c *Client) queryNodeMetrics(ctx context.Context, m *Metrics) error {
 	m.Nodes.MemoryGB = floatValue(results["memory_bytes"])
 
 	return nil
+}
+
+// queryNodeDetailsMetrics queries per-node metrics from Mimir
+func (c *Client) queryNodeDetailsMetrics(ctx context.Context, m *Metrics) error {
+	// Query node names and basic info
+	nodes, err := c.queryWithLabels(ctx, `kube_node_info`)
+	if err != nil {
+		return fmt.Errorf("failed to get node list: %w", err)
+	}
+
+	for _, node := range nodes {
+		detail := NodeDetail{
+			Name: node,
+		}
+
+		// Query per-node metrics
+		cpuQuery := fmt.Sprintf(`round(100*(1-avg(rate(node_cpu_seconds_total{node="%s",mode="idle"}[5m]))),1)`, node)
+		if cpu, err := c.query(ctx, cpuQuery); err == nil && cpu >= 0 {
+			detail.CPUUsagePercent = cpu
+		}
+
+		memQuery := fmt.Sprintf(`round(100*(1-node_memory_MemAvailable_bytes{node="%s"}/node_memory_MemTotal_bytes{node="%s"}),1)`, node, node)
+		if mem, err := c.query(ctx, memQuery); err == nil && mem >= 0 {
+			detail.MemoryUsagePercent = mem
+		}
+
+		memAvailQuery := fmt.Sprintf(`round(node_memory_MemAvailable_bytes{node="%s"}/1024/1024/1024,1)`, node)
+		if memAvail, err := c.query(ctx, memAvailQuery); err == nil && memAvail >= 0 {
+			detail.AvailableMemoryGB = memAvail
+		}
+
+		// Check if node is ready and schedulable
+		readyQuery := fmt.Sprintf(`kube_node_status_condition{node="%s",condition="Ready",status="true"}`, node)
+		if ready, err := c.query(ctx, readyQuery); err == nil && ready > 0 {
+			detail.Ready = true
+		}
+
+		unschQuery := fmt.Sprintf(`kube_node_spec_unschedulable{node="%s"}`, node)
+		if unsch, err := c.query(ctx, unschQuery); err == nil && unsch > 0 {
+			detail.Unschedulable = true
+		}
+
+		// Query pod count on this node
+		podQuery := fmt.Sprintf(`count(kube_pod_info{node="%s"})`, node)
+		if podCount, err := c.query(ctx, podQuery); err == nil && podCount >= 0 {
+			detail.PodCount = int(podCount)
+		}
+
+		m.NodeDetails = append(m.NodeDetails, detail)
+	}
+
+	return nil
+}
+
+// queryWithLabels queries a metric and returns all unique values of the 'node' label
+func (c *Client) queryWithLabels(ctx context.Context, promql string) ([]string, error) {
+	u, err := url.Parse(c.baseURL + "/api/v1/query")
+	if err != nil {
+		return nil, err
+	}
+
+	q := u.Query()
+	q.Set("query", promql)
+	q.Set("time", fmt.Sprintf("%d", time.Now().Unix()-300))
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("X-Scope-OrgID", "admin")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("query failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("query returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Data struct {
+			Result []struct {
+				Metric map[string]string `json:"metric"`
+			} `json:"result"`
+		} `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	nodeSet := make(map[string]bool)
+	for _, item := range result.Data.Result {
+		if node, ok := item.Metric["node"]; ok {
+			nodeSet[node] = true
+		}
+	}
+
+	nodes := make([]string, 0, len(nodeSet))
+	for node := range nodeSet {
+		nodes = append(nodes, node)
+	}
+
+	return nodes, nil
 }
 
 // queryPodMetrics queries pod status from Mimir

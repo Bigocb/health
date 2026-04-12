@@ -138,6 +138,26 @@ func (r *Reporter) Generate(ctx context.Context) (*types.Report, error) {
 		},
 	}
 
+	// Convert per-node metrics from mimir to types.NodeMetrics
+	if len(metrics.NodeDetails) > 0 {
+		for _, detail := range metrics.NodeDetails {
+			report.NodeMetrics = append(report.NodeMetrics, types.NodeMetrics{
+				Name:               detail.Name,
+				Ready:              detail.Ready,
+				Unschedulable:      detail.Unschedulable,
+				CPUUsagePercent:    detail.CPUUsagePercent,
+				MemoryUsagePercent: detail.MemoryUsagePercent,
+				AvailableMemoryGB:  detail.AvailableMemoryGB,
+				PodCount:           detail.PodCount,
+			})
+		}
+	}
+
+	// Gather failed pods details
+	if metrics.Pods.Failed > 0 && r.lokiClient != nil {
+		report.FailedPods = r.getFailedPodsList(ctx)
+	}
+
 	if r.testRegistry != nil {
 		smokeTestResults := r.testRegistry.RunAllTests(ctx)
 		for _, result := range smokeTestResults {
@@ -194,6 +214,33 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 
 	if r.llmClient != nil && r.llmClient.IsAvailable(ctx) {
 		metricsText := r.formatMetricsAsText(report.ClusterMetrics)
+
+		// Add per-node metrics to analysis
+		if len(report.NodeMetrics) > 0 {
+			metricsText += "\n## Per-Node Metrics\n"
+			for _, node := range report.NodeMetrics {
+				readyStr := "Ready"
+				if !node.Ready {
+					readyStr = "NotReady"
+				}
+				schedStr := "Schedulable"
+				if node.Unschedulable {
+					schedStr = "Unschedulable"
+				}
+				metricsText += fmt.Sprintf("- %s: %s, %s, CPU: %.1f%%, Memory: %.1f%%, Available: %.1fGB, Pods: %d\n",
+					node.Name, readyStr, schedStr, node.CPUUsagePercent, node.MemoryUsagePercent, node.AvailableMemoryGB, node.PodCount)
+			}
+		}
+
+		// Add failed pods to analysis
+		if len(report.FailedPods) > 0 {
+			metricsText += "\n## Failed Pods\n"
+			for _, pod := range report.FailedPods {
+				metricsText += fmt.Sprintf("- %s/%s: Phase=%s, Reason=%s, LastError=%s\n",
+					pod.Namespace, pod.Name, pod.Phase, pod.Reason, pod.LastError)
+			}
+		}
+
 		smokeTestsJSON, _ := json.Marshal(report.SmokeTests)
 
 		// Phase 1: Data Analysis - Classify metrics with thresholds
@@ -323,6 +370,55 @@ func (r *Reporter) getPodDetails(ctx context.Context, report *types.Report) stri
 	}
 
 	return details
+}
+
+// getFailedPodsList queries for failed pods with error context
+func (r *Reporter) getFailedPodsList(ctx context.Context) []types.FailedPod {
+	if r.lokiClient == nil {
+		return nil
+	}
+
+	var failedPods []types.FailedPod
+
+	// Get failed pod errors from Loki with pod/namespace info
+	failedPodErrors, err := r.lokiClient.GetFailedPodsErrors(ctx)
+	if err != nil || len(failedPodErrors) == 0 {
+		return failedPods
+	}
+
+	// Convert error map to FailedPod array
+	// Map key format is typically "namespace/pod-name"
+	for podKey, errors := range failedPodErrors {
+		lastError := ""
+		if len(errors) > 0 {
+			lastError = errors[0]
+		}
+
+		// Parse namespace/name from key
+		namespace := "unknown"
+		name := podKey
+		if idx := len(podKey) - 1; idx > 0 {
+			// Try to extract namespace from the pod key if it contains /
+			for i := 0; i < len(podKey); i++ {
+				if podKey[i] == '/' {
+					namespace = podKey[:i]
+					name = podKey[i+1:]
+					break
+				}
+			}
+		}
+
+		failedPods = append(failedPods, types.FailedPod{
+			Namespace:   namespace,
+			Name:        name,
+			Phase:       "Failed",
+			Reason:      "Unknown",
+			LastError:   lastError,
+			RestartCount: 0,
+		})
+	}
+
+	return failedPods
 }
 
 func (r *Reporter) HasAnalyzer() bool {
