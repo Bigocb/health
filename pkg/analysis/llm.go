@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -357,6 +358,18 @@ func ValidatePhase1Response(jsonStr string) string {
 	log.Printf("[VALIDATOR] Starting validation of Phase 1 response (length: %d chars)", len(jsonStr))
 	thresholds := DefaultThresholds()
 
+	// Strip markdown code fence markers if present
+	cleanedStr := strings.TrimSpace(jsonStr)
+	if strings.HasPrefix(cleanedStr, "```json") {
+		cleanedStr = strings.TrimPrefix(cleanedStr, "```json")
+		cleanedStr = strings.TrimSuffix(cleanedStr, "```")
+		cleanedStr = strings.TrimSpace(cleanedStr)
+	} else if strings.HasPrefix(cleanedStr, "```") {
+		cleanedStr = strings.TrimPrefix(cleanedStr, "```")
+		cleanedStr = strings.TrimSuffix(cleanedStr, "```")
+		cleanedStr = strings.TrimSpace(cleanedStr)
+	}
+
 	var response struct {
 		OverallHealth   string `json:"overall_health"`
 		MetricsSummary  map[string]interface{} `json:"metrics_summary"`
@@ -364,8 +377,8 @@ func ValidatePhase1Response(jsonStr string) string {
 		FlaggedIssues   []map[string]interface{} `json:"flagged_issues"`
 	}
 
-	if err := json.Unmarshal([]byte(jsonStr), &response); err != nil {
-		log.Printf("[VALIDATOR] Failed to parse Phase 1 response: %v", err)
+	if err := json.Unmarshal([]byte(cleanedStr), &response); err != nil {
+		log.Printf("[VALIDATOR] Failed to parse Phase 1 response: %v (after stripping markdown)", err)
 		return jsonStr // Return unchanged if parse fails
 	}
 
