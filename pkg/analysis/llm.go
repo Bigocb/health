@@ -222,8 +222,14 @@ func (l *LLMClient) GenerateDataAnalysisPrompt(metrics string, trends string) st
 %s
 
 ## Your Task: Classify Each Metric
-For each metric, determine its status (good/elevated/critical) using the thresholds above.
-Also classify per-node health: mark nodes as critical if unschedulable, elevated if CPU >85%% OR Memory >90%%.
+STRICTLY use these thresholds (do not interpret, do not estimate):
+1. Memory: If value < 75 THEN good, IF 75 <= value < 90 THEN elevated, IF value >= 90 THEN critical
+2. CPU: If value < 70 THEN good, IF 70 <= value < 85 THEN elevated, IF value >= 85 THEN critical
+3. Disk: If value < 80 THEN good, IF 80 <= value < 95 THEN elevated, IF value >= 95 THEN critical
+4. Failed Pods: If value > 0 THEN elevated, If value > 5 THEN critical
+5. Pending Pods: If value > 0 THEN elevated
+
+Only include metrics in flagged_issues if they are elevated or critical. Include the exact numeric threshold comparison.
 
 Respond with ONLY valid JSON (no markdown, no commentary):
 {
@@ -265,6 +271,14 @@ Only include flagged_issues if status is elevated or critical. Only include node
 // GenerateNarrativePrompt creates a prompt for Phase 2: narrative generation based on structured analysis
 func (l *LLMClient) GenerateNarrativePrompt(dataAnalysisJSON string, smokeTests string, logContext string) string {
 	return fmt.Sprintf(`You are a Kubernetes cluster health analyst. Based on structured analysis, generate a narrative report.
+
+## IMPORTANT INSTRUCTIONS
+- Reference ONLY the flagged_issues from the Phase 1 analysis
+- If no issues are flagged, cluster is healthy
+- Do NOT invent metrics or thresholds
+- Do NOT modify severity levels from Phase 1
+- If Phase 1 says something is critical, you say it is critical
+- If Phase 1 says something is good, do NOT mention it as a problem
 
 ## Structured Data Analysis (Phase 1 Results)
 %s
