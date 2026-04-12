@@ -257,6 +257,9 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 			return result
 		}
 
+		// Validate and correct thresholds server-side to fix LLM misclassifications
+		dataAnalysisJSON = analysis.ValidatePhase1Response(dataAnalysisJSON)
+
 		log.Printf("LLM Phase 1 analysis: %s", dataAnalysisJSON)
 
 		// Phase 2: Narrative Generation - Create report based on analysis

@@ -221,15 +221,33 @@ func (l *LLMClient) GenerateDataAnalysisPrompt(metrics string, trends string) st
 ## Recent Trends
 %s
 
-## Your Task: Classify Each Metric
-STRICTLY use these thresholds (do not interpret, do not estimate):
-1. Memory: If value < 75 THEN good, IF 75 <= value < 90 THEN elevated, IF value >= 90 THEN critical
-2. CPU: If value < 70 THEN good, IF 70 <= value < 85 THEN elevated, IF value >= 85 THEN critical
-3. Disk: If value < 80 THEN good, IF 80 <= value < 95 THEN elevated, IF value >= 95 THEN critical
-4. Failed Pods: If value > 0 THEN elevated, If value > 5 THEN critical
-5. Pending Pods: If value > 0 THEN elevated
+## Your Task: Classify Each Metric - USE EXACT THRESHOLDS ONLY
+CRITICAL: Apply these EXACT thresholds. Do not deviate. Do not interpret trends.
 
-Only include metrics in flagged_issues if they are elevated or critical. Include the exact numeric threshold comparison.
+**MEMORY_USAGE_PERCENT**
+- If value is LESS THAN 75: status = "good"
+- If value is 75 OR MORE and LESS THAN 90: status = "elevated"
+- If value is 90 OR MORE: status = "critical"
+- Examples: 25% = GOOD, 75% = elevated, 90% = critical
+
+**CPU_USAGE_PERCENT**
+- If value is LESS THAN 70: status = "good"
+- If value is 70 OR MORE and LESS THAN 85: status = "elevated"
+- If value is 85 OR MORE: status = "critical"
+- Examples: 50% = GOOD, 70% = elevated, 85% = critical
+
+**DISK_USAGE_PERCENT**
+- If value is LESS THAN 80: status = "good"
+- If value is 80 OR MORE and LESS THAN 95: status = "elevated"
+- If value is 95 OR MORE: status = "critical"
+- Examples: 45% = GOOD, 80% = elevated, 95% = critical
+
+**FAILED_PODS**
+- If count is 0: status = "good"
+- If count is 1-5: status = "elevated"
+- If count is 6+: status = "critical"
+
+Only include metrics in flagged_issues if status is "elevated" or "critical".
 
 Respond with ONLY valid JSON (no markdown, no commentary):
 {
@@ -331,4 +349,125 @@ func (l *LLMClient) IsAvailable(ctx context.Context) bool {
 	defer resp.Body.Close()
 
 	return resp.StatusCode == http.StatusOK
+}
+
+// ValidatePhase1Response applies server-side threshold enforcement to Phase 1 LLM output
+// This corrects any misclassifications by the LLM and ensures strict threshold rules are applied
+func ValidatePhase1Response(jsonStr string) string {
+	thresholds := DefaultThresholds()
+
+	var response struct {
+		OverallHealth   string `json:"overall_health"`
+		MetricsSummary  map[string]interface{} `json:"metrics_summary"`
+		NodeHealth      []map[string]interface{} `json:"node_health"`
+		FlaggedIssues   []map[string]interface{} `json:"flagged_issues"`
+	}
+
+	if err := json.Unmarshal([]byte(jsonStr), &response); err != nil {
+		log.Printf("[VALIDATOR] Failed to parse Phase 1 response: %v", err)
+		return jsonStr // Return unchanged if parse fails
+	}
+
+	// Apply threshold corrections to metrics_summary
+	if response.MetricsSummary != nil {
+		metricsToCorrect := []struct {
+			key       string
+			valueKey  string
+			threshold ResourceThreshold
+		}{
+			{"cpu_usage_percent", "cpu_usage_percent", thresholds.CPU},
+			{"memory_usage_percent", "memory_usage_percent", thresholds.Memory},
+			{"disk_usage_percent", "disk_usage_percent", thresholds.Disk},
+		}
+
+		for _, m := range metricsToCorrect {
+			if metricData, ok := response.MetricsSummary[m.key].(map[string]interface{}); ok {
+				if value, ok := metricData["value"].(float64); ok {
+					correctStatus := m.threshold.EvaluateStatus(value)
+					oldStatus := ""
+					if status, ok := metricData["status"].(string); ok {
+						oldStatus = status
+					}
+					metricData["status"] = correctStatus
+					if oldStatus != correctStatus {
+						log.Printf("[VALIDATOR] %s: %.1f%% - corrected status from '%s' to '%s'", m.key, value, oldStatus, correctStatus)
+					}
+				}
+			}
+		}
+
+		// Correct failed_pods status (0=good, 1-5=elevated, 6+=critical)
+		if podsFailedData, ok := response.MetricsSummary["pods_failed"].(map[string]interface{}); ok {
+			if value, ok := podsFailedData["value"].(float64); ok {
+				var correctStatus string
+				if value == 0 {
+					correctStatus = "good"
+				} else if value <= 5 {
+					correctStatus = "elevated"
+				} else {
+					correctStatus = "critical"
+				}
+				oldStatus := ""
+				if status, ok := podsFailedData["status"].(string); ok {
+					oldStatus = status
+				}
+				podsFailedData["status"] = correctStatus
+				if oldStatus != correctStatus {
+					log.Printf("[VALIDATOR] pods_failed: %.0f - corrected status from '%s' to '%s'", value, oldStatus, correctStatus)
+				}
+			}
+		}
+
+		// Correct pending_pods status (same as failed_pods)
+		if podsPendingData, ok := response.MetricsSummary["pods_pending"].(map[string]interface{}); ok {
+			if value, ok := podsPendingData["value"].(float64); ok {
+				var correctStatus string
+				if value == 0 {
+					correctStatus = "good"
+				} else if value <= 5 {
+					correctStatus = "elevated"
+				} else {
+					correctStatus = "critical"
+				}
+				oldStatus := ""
+				if status, ok := podsPendingData["status"].(string); ok {
+					oldStatus = status
+				}
+				podsPendingData["status"] = correctStatus
+				if oldStatus != correctStatus {
+					log.Printf("[VALIDATOR] pods_pending: %.0f - corrected status from '%s' to '%s'", value, oldStatus, correctStatus)
+				}
+			}
+		}
+
+		// Correct unschedulable_nodes status (0=good, >0=elevated)
+		if nodesUnschedulableData, ok := response.MetricsSummary["nodes_unschedulable"].(map[string]interface{}); ok {
+			if value, ok := nodesUnschedulableData["value"].(float64); ok {
+				var correctStatus string
+				if value == 0 {
+					correctStatus = "good"
+				} else {
+					correctStatus = "elevated"
+				}
+				oldStatus := ""
+				if status, ok := nodesUnschedulableData["status"].(string); ok {
+					oldStatus = status
+				}
+				nodesUnschedulableData["status"] = correctStatus
+				if oldStatus != correctStatus {
+					log.Printf("[VALIDATOR] nodes_unschedulable: %.0f - corrected status from '%s' to '%s'", value, oldStatus, correctStatus)
+				}
+			}
+		}
+	}
+
+	// Re-marshal to JSON
+	correctedBytes, err := json.Marshal(response)
+	if err != nil {
+		log.Printf("[VALIDATOR] Failed to re-marshal corrected response: %v", err)
+		return jsonStr
+	}
+
+	log.Printf("[VALIDATOR] Phase 1 response validated and corrected")
+	return string(correctedBytes)
 }
