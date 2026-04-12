@@ -245,29 +245,42 @@ CRITICAL: Apply these EXACT thresholds. Do not deviate. Do not interpret trends.
 - If value >= 95: status = critical
 - Example: 45%% = good, 80%% = elevated, 95%% = critical
 
-## Response Format (Markdown - no JSON)
+## CRITICAL: RESPONSE FORMAT
+DO NOT OUTPUT JSON.
+DO NOT OUTPUT CURLY BRACES.
+DO NOT OUTPUT SQUARE BRACKETS WITH KEY-VALUE PAIRS.
+
+Output ONLY plain markdown text using this EXACT format:
 
 ### Overall Health
-[healthy|degraded|critical]
+degraded
 
 ### Metrics Summary
-- CPU Usage: {value}%% → **{status}**
-- Memory Usage: {value}%% → **{status}**
-- Disk Usage: {value}%% → **{status}**
-- Available Memory: {value} GB
-- Available Storage: {value} GB
-- Nodes Total: {value} (Ready: {value}, Unschedulable: {value})
-- Pods Total: {value} (Running: {value}, Failed: {value}, Pending: {value})
+- CPU Usage: 19.0%% → **good**
+- Memory Usage: 25.0%% → **good**
+- Disk Usage: 45.0%% → **good**
+- Available Memory: 121 GB
+- Available Storage: 637 GB
+- Nodes Total: 2 (Ready: 2, Unschedulable: 1)
+- Pods Total: 147 (Running: 147, Failed: 7, Pending: 0)
 
 ### Node Health
-- node-name: **{status}** {optional reason}
+- vps01: **good**
+- app01: **elevated** (unschedulable)
+- internal: **good**
 
-### Flagged Issues (elevated or critical only)
-- metric_name: {value} → **{severity}** (description)
+### Flagged Issues
+- pods_failed: 7 → **critical** (More than 5 failed pods)
+- nodes_unschedulable: 1 → **elevated** (At least 1 unschedulable node)
 
-Only include node_health section if there are nodes.
-Only include flagged_issues if there are elevated or critical items.
-Use exactly the format shown above.`, metrics, trends)
+Rules:
+- Only output markdown text
+- Start with ### Overall Health
+- Include ### Metrics Summary with each metric value
+- Only include ### Node Health if there are nodes
+- Only include ### Flagged Issues if there are elevated or critical items
+- Use this exact line format for metrics: "- Name: {number} → **{status}**"
+- NO JSON, NO BRACES, NO BRACKETS - ONLY MARKDOWN TEXT`, metrics, trends)
 }
 
 // GenerateNarrativePrompt creates a prompt for Phase 2: narrative generation based on structured analysis
