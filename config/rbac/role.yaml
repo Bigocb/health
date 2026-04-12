@@ -1,0 +1,32 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: health-reporter-controller
+  labels:
+    app: health-reporter
+rules:
+  # SmokeTest CRD permissions
+  - apiGroups:
+      - health.archipelago.ai
+    resources:
+      - smoketests
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - health.archipelago.ai
+    resources:
+      - smoketests/status
+    verbs:
+      - get
+      - patch
+      - update
+  # Event permissions for recording events
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch

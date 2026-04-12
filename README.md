@@ -4,16 +4,22 @@ A Kubernetes cluster health monitoring tool that collects metrics from Mimir and
 
 ## Features
 
-### Phase 1 (Current)
+### Phase 1 (Complete)
 - ✅ Mimir metrics collection (nodes, pods, resources)
 - ✅ Health status calculation (healthy/degraded/critical)
 - ✅ Discord webhook integration
 - ✅ Configurable thresholds
 - ✅ Daemon mode or one-off execution
 
-### Phase 2 (Planned)
-- Smoke test suite (DNS, HTTP, TCP connectivity)
-- Integration of smoke test results into reports
+### Phase 2 (In Progress)
+- ✅ Kubernetes-native CRD for smoke test definitions
+- ✅ Controller pattern for managing tests
+- ✅ DNS resolution tests
+- ✅ HTTP health check tests
+- ✅ TCP connectivity tests
+- ✅ Integration into cluster health reports
+- ✅ Hot-reload (tests update via kubectl apply)
+- ✅ Discord integration for test results
 
 ### Phase 3 (Planned)
 - Multi-channel output (Slack, generic webhooks)
@@ -82,28 +88,235 @@ See `config.yaml.example` for format.
   --verbose
 ```
 
+## Phase 2: Kubernetes Smoke Tests
+
+Phase 2 introduces CRD-based smoke tests managed by a Kubernetes controller. Tests are defined as `SmokeTest` resources and automatically discovered and executed by the controller.
+
+### SmokeTest CRD
+
+Tests are defined as Kubernetes resources:
+
+```yaml
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: kubernetes-dns
+  namespace: monitoring
+spec:
+  type: dns              # dns, http, or tcp
+  enabled: true
+  severity: high         # critical, high, medium, low
+  timeout: "5s"
+  domain: kubernetes.default
+```
+
+### Test Types
+
+#### DNS Test
+Verifies domain name resolution:
+
+```yaml
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: dns-resolution
+  namespace: monitoring
+spec:
+  type: dns
+  domain: kubernetes.default
+  severity: high
+  timeout: "5s"
+```
+
+#### HTTP Test
+Performs HTTP health checks:
+
+```yaml
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: api-health
+  namespace: monitoring
+spec:
+  type: http
+  url: https://api.example.com/health
+  method: GET
+  expectedStatus: 200
+  timeout: "10s"
+  headers:
+    Authorization: "Bearer token"
+  tlsInsecure: false
+  severity: critical
+```
+
+#### TCP Test
+Tests TCP port connectivity:
+
+```yaml
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: etcd-connectivity
+  namespace: monitoring
+spec:
+  type: tcp
+  host: etcd.default
+  port: 2379
+  timeout: "5s"
+  severity: critical
+```
+
+### Managing Tests
+
+#### Add a Test
+```bash
+kubectl apply -f - <<EOF
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: my-test
+  namespace: monitoring
+spec:
+  type: http
+  url: https://myservice.example.com
+  severity: high
+EOF
+```
+
+#### List Tests
+```bash
+kubectl get smoketests -n monitoring
+```
+
+#### View Test Details
+```bash
+kubectl describe smoketest <name> -n monitoring
+```
+
+#### View Test Results
+```bash
+kubectl get smoketest <name> -n monitoring -o jsonpath='{.status}'
+```
+
+#### Delete a Test
+```bash
+kubectl delete smoketest <name> -n monitoring
+```
+
+#### Hot-Reload
+Tests update automatically when CRDs change - no restart needed:
+
+```bash
+# Update a test
+kubectl patch smoketest <name> -n monitoring --type merge -p '{"spec":{"enabled":false}}'
+
+# The controller immediately removes it from the registry
+```
+
+### Controller Deployment
+
+The controller runs as a separate deployment:
+
+```bash
+# Via Helm
+helm install health-reporter ./helm/health-reporter \
+  -n monitoring \
+  --set controller.enabled=true
+
+# Manual deployment
+kubectl apply -f config/crd/smoketest_crd.yaml
+kubectl apply -f config/rbac/
+kubectl apply -f config/samples/
+```
+
+### Integration with Health Reports
+
+Smoke test results are automatically included in cluster health reports:
+
+1. **Summary**: Pass/fail counts displayed in hourly report
+2. **Details**: Separate Discord message with detailed test results
+3. **Status**: Test failures elevate cluster status to degraded or critical
+4. **Recommendations**: Failing tests trigger relevant recommendations
+
+### Test Results in Discord
+
+The hourly health report includes smoke test summaries:
+
+```
+Smoke Tests: 3 passed, 0 failed
+```
+
+Failed tests trigger detailed notifications with:
+- Test name and type
+- Status and error message
+- Duration
+- Severity level
+
+### Running Tests Locally
+
+For testing without Kubernetes:
+
+```bash
+# Run once with controller disabled
+./health-reporter --once --skip-controller
+
+# Or run via CronJob in test cluster
+kubectl run -it --rm \
+  --image=health-reporter:latest \
+  test \
+  -n monitoring \
+  -- --once --verbose
+```
+
 ## Project Structure
 
 ```
 health-reporter/
+├── api/
+│   └── v1alpha1/
+│       ├── groupversion_info.go      # API group info
+│       └── smoketest_types.go        # SmokeTest CRD definition
 ├── cmd/
 │   └── health-reporter/
-│       └── main.go          # Entry point
+│       └── main.go                   # Entry point
+├── controllers/
+│   └── smoketest_controller.go       # Controller for SmokeTest CRD
 ├── pkg/
 │   ├── config/
-│   │   └── config.go        # Configuration management
+│   │   └── config.go                 # Configuration management
 │   ├── health/
-│   │   └── health.go        # Core health reporting logic
+│   │   └── health.go                 # Core health reporting logic
 │   ├── mimir/
-│   │   └── mimir.go         # Mimir metrics client
+│   │   └── mimir.go                  # Mimir metrics client
+│   ├── smoke_tests/
+│   │   ├── types.go                  # Test types and interfaces
+│   │   ├── dns_test.go               # DNS test implementation
+│   │   ├── http_test.go              # HTTP test implementation
+│   │   ├── tcp_test.go               # TCP test implementation
+│   │   └── registry.go               # Test registry
 │   └── webhook/
-│       └── discord.go       # Discord webhook sender
-├── go.mod                   # Go module definition
-├── go.sum                   # Dependency checksums
-├── config.yaml.example      # Example configuration
-├── Dockerfile               # Container image
-├── Helm/                    # Helm chart (Phase 1)
-└── README.md                # This file
+│       └── discord.go                # Discord webhook sender
+├── config/
+│   ├── crd/
+│   │   └── smoketest_crd.yaml        # SmokeTest CRD manifest
+│   ├── rbac/
+│   │   ├── role.yaml                 # Controller RBAC role
+│   │   ├── rolebinding.yaml          # Controller RBAC binding
+│   │   └── serviceaccount.yaml       # Service account
+│   └── samples/
+│       ├── dns_test.yaml             # Example DNS test
+│       ├── http_test.yaml            # Example HTTP test
+│       └── tcp_test.yaml             # Example TCP test
+├── go.mod                            # Go module definition
+├── go.sum                            # Dependency checksums
+├── config.yaml.example               # Example configuration
+├── Dockerfile                        # Container image
+├── helm/
+│   └── health-reporter/              # Helm chart
+│       ├── Chart.yaml
+│       ├── values.yaml
+│       └── templates/
+└── README.md                         # This file
 ```
 
 ## Metrics Collected

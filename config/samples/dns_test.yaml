@@ -1,0 +1,15 @@
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: kubernetes-dns
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: dns
+spec:
+  type: dns
+  enabled: true
+  severity: high
+  timeout: "5s"
+  interval: "1m"
+  domain: kubernetes.default

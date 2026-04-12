@@ -1,0 +1,20 @@
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: kubernetes-api-health
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: http
+spec:
+  type: http
+  enabled: true
+  severity: critical
+  timeout: "10s"
+  interval: "5m"
+  url: https://kubernetes.default:443/livez
+  method: GET
+  expectedStatus: 200
+  tlsInsecure: true
+  headers:
+    Authorization: "Bearer $(cat /run/secrets/kubernetes.io/serviceaccount/token)"

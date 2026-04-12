@@ -1,0 +1,142 @@
+{{- if .Values.crd.install }}
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: smoketests.health.archipelago.ai
+  labels:
+    {{ include "health-reporter.labels" . | nindent 4 }}
+spec:
+  group: health.archipelago.ai
+  names:
+    kind: SmokeTest
+    plural: smoketests
+    shortNames:
+      - st
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              required:
+                - type
+              properties:
+                type:
+                  description: Type of smoke test (dns, http, tcp)
+                  type: string
+                  enum:
+                    - dns
+                    - http
+                    - tcp
+                enabled:
+                  description: Enable or disable this test
+                  type: boolean
+                  default: true
+                severity:
+                  description: Severity level of this test
+                  type: string
+                  enum:
+                    - critical
+                    - high
+                    - medium
+                    - low
+                  default: high
+                timeout:
+                  description: Timeout for the test (e.g., "5s", "30s")
+                  type: string
+                  default: "10s"
+                interval:
+                  description: How often to run this test
+                  type: string
+                  default: "1m"
+                # DNS fields
+                domain:
+                  description: Domain to resolve (for DNS tests)
+                  type: string
+                # HTTP fields
+                url:
+                  description: URL to test (for HTTP tests)
+                  type: string
+                method:
+                  description: HTTP method
+                  type: string
+                  enum:
+                    - GET
+                    - POST
+                    - PUT
+                    - DELETE
+                    - HEAD
+                    - OPTIONS
+                  default: GET
+                expectedStatus:
+                  description: Expected HTTP status code
+                  type: integer
+                  minimum: 100
+                  maximum: 599
+                tlsInsecure:
+                  description: Allow insecure HTTPS connections
+                  type: boolean
+                  default: false
+                headers:
+                  description: Custom HTTP headers
+                  type: object
+                  additionalProperties:
+                    type: string
+                # TCP fields
+                host:
+                  description: Host to connect to (for TCP tests)
+                  type: string
+                port:
+                  description: Port to connect to (for TCP tests)
+                  type: integer
+                  minimum: 1
+                  maximum: 65535
+            status:
+              type: object
+              properties:
+                lastRun:
+                  type: string
+                  format: date-time
+                lastStatus:
+                  type: string
+                  enum:
+                    - pass
+                    - fail
+                    - timeout
+                    - unknown
+                lastMessage:
+                  type: string
+                passCount:
+                  type: integer
+                failCount:
+                  type: integer
+                lastDuration:
+                  description: Duration of last test in milliseconds
+                  type: integer
+      additionalPrinterColumns:
+        - name: Type
+          type: string
+          jsonPath: .spec.type
+        - name: Enabled
+          type: boolean
+          jsonPath: .spec.enabled
+        - name: Status
+          type: string
+          jsonPath: .status.lastStatus
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+{{- end }}

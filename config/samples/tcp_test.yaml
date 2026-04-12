@@ -1,0 +1,16 @@
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: etcd-tcp
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: tcp
+spec:
+  type: tcp
+  enabled: true
+  severity: critical
+  timeout: "5s"
+  interval: "2m"
+  host: etcd.default
+  port: 2379

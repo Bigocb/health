@@ -22,6 +22,17 @@ type Report struct {
 	ClusterMetrics  map[string]interface{} `json:"cluster_metrics"`
 	Concerns        []Concern              `json:"concerns,omitempty"`
 	Recommendations []string               `json:"recommendations,omitempty"`
+	SmokeTests      []SmokeTestResult      `json:"smoke_tests,omitempty"`
+}
+
+// SmokeTestResult represents the result of a smoke test
+type SmokeTestResult struct {
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	Status   string `json:"status"` // pass, fail, timeout
+	Message  string `json:"message"`
+	Duration int    `json:"duration_ms"`
+	Severity string `json:"severity"` // critical, high, medium, low
 }
 
 // Concern represents an identified issue

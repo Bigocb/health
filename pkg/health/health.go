@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ArchipelagoAI/health-reporter/pkg/mimir"
+	"github.com/ArchipelagoAI/health-reporter/pkg/smoke_tests"
 	"github.com/ArchipelagoAI/health-reporter/pkg/types"
 	"github.com/ArchipelagoAI/health-reporter/pkg/webhook"
 )
@@ -19,16 +20,23 @@ type Concern struct {
 
 // Reporter generates health reports
 type Reporter struct {
-	mimirClient *mimir.Client
-	sender      webhook.Sender
+	mimirClient  *mimir.Client
+	sender       webhook.Sender
+	testRegistry smoke_tests.TestRegistry
 }
 
 // NewReporter creates a new health reporter
 func NewReporter(mimirClient *mimir.Client, sender webhook.Sender) *Reporter {
 	return &Reporter{
-		mimirClient: mimirClient,
-		sender:      sender,
+		mimirClient:  mimirClient,
+		sender:       sender,
+		testRegistry: nil,
 	}
+}
+
+// SetTestRegistry sets the smoke test registry
+func (r *Reporter) SetTestRegistry(registry smoke_tests.TestRegistry) {
+	r.testRegistry = registry
 }
 
 // Generate generates a health report from current metrics
@@ -63,6 +71,21 @@ func (r *Reporter) Generate(ctx context.Context) (*types.Report, error) {
 				"available_storage_gb": metrics.Resources.AvailableStorageGB,
 			},
 		},
+	}
+
+	// Run smoke tests if registry is available
+	if r.testRegistry != nil {
+		smokeTestResults := r.testRegistry.RunAllTests(ctx)
+		for _, result := range smokeTestResults {
+			report.SmokeTests = append(report.SmokeTests, types.SmokeTestResult{
+				Name:     result.Name,
+				Type:     result.Type,
+				Status:   result.Status,
+				Message:  result.Message,
+				Duration: int(result.Duration.Milliseconds()),
+				Severity: result.Severity,
+			})
+		}
 	}
 
 	// Calculate overall status

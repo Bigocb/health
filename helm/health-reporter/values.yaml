@@ -9,6 +9,23 @@ image:
   tag: latest
   pullPolicy: Always
 
+# CRD Configuration
+crd:
+  # Install CRD (only needed on first install)
+  install: true
+
+# Controller Configuration
+controller:
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
 # Mimir configuration
 mimir:
   url: "http://mimir-nginx.monitoring.svc.cluster.local:80/prometheus"
@@ -92,6 +109,24 @@ env: {}
 # Logging
 logging:
   verbose: false
+
+# Smoke Tests - Example sample tests to install
+smokeTests:
+  # Uncomment to enable sample tests
+  # - name: kubernetes-dns
+  #   type: dns
+  #   severity: high
+  #   domain: kubernetes.default
+  # - name: kubernetes-api
+  #   type: http
+  #   severity: critical
+  #   url: https://kubernetes.default:443/livez
+  #   expectedStatus: 200
+  # - name: etcd-tcp
+  #   type: tcp
+  #   severity: critical
+  #   host: etcd.default
+  #   port: 2379
 
 # Volume mounts (for future use)
 volumeMounts: []

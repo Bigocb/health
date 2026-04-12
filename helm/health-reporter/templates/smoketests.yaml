@@ -1,0 +1,41 @@
+{{- range .Values.smokeTests }}
+---
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    {{ include "health-reporter.labels" $ | nindent 4 }}
+spec:
+  type: {{ .type }}
+  enabled: {{ .enabled | default true }}
+  severity: {{ .severity | default "high" }}
+  timeout: {{ .timeout | default "10s" | quote }}
+  interval: {{ .interval | default "1m" | quote }}
+  {{- if .domain }}
+  domain: {{ .domain }}
+  {{- end }}
+  {{- if .url }}
+  url: {{ .url }}
+  {{- end }}
+  {{- if .method }}
+  method: {{ .method }}
+  {{- end }}
+  {{- if .expectedStatus }}
+  expectedStatus: {{ .expectedStatus }}
+  {{- end }}
+  {{- if .tlsInsecure }}
+  tlsInsecure: {{ .tlsInsecure }}
+  {{- end }}
+  {{- if .headers }}
+  headers:
+    {{- toYaml .headers | nindent 4 }}
+  {{- end }}
+  {{- if .host }}
+  host: {{ .host }}
+  {{- end }}
+  {{- if .port }}
+  port: {{ .port }}
+  {{- end }}
+{{- end }}

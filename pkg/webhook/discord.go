@@ -170,6 +170,44 @@ func (d *DiscordSender) formatEmbed(report *types.Report) map[string]interface{}
 		},
 	}
 
+	// Add smoke tests section
+	if len(report.SmokeTests) > 0 {
+		passCount := 0
+		failCount := 0
+		for _, test := range report.SmokeTests {
+			if test.Status == "pass" {
+				passCount++
+			} else {
+				failCount++
+			}
+		}
+		smokeTestsSummary := fmt.Sprintf("%d passed, %d failed", passCount, failCount)
+		fields = append(fields, map[string]interface{}{
+			"name":   "Smoke Tests",
+			"value":  smokeTestsSummary,
+			"inline": true,
+		})
+
+		// If there are failures, add details
+		if failCount > 0 {
+			failuresText := ""
+			for _, test := range report.SmokeTests {
+				if test.Status != "pass" {
+					if failuresText != "" {
+						failuresText += "\n"
+					}
+					failuresText += fmt.Sprintf("• **%s** (%s): %s", test.Name, test.Type, test.Message)
+				}
+			}
+			if failuresText != "" {
+				fields = append(fields, map[string]interface{}{
+					"name":  "Failed Tests",
+					"value": failuresText,
+				})
+			}
+		}
+	}
+
 	// Add concerns section
 	if len(report.Concerns) > 0 {
 		concernsText := ""
@@ -208,7 +246,60 @@ func (d *DiscordSender) formatEmbed(report *types.Report) map[string]interface{}
 		"timestamp":   report.Timestamp.Format(time.RFC3339),
 	}
 
+	// Send separate detailed notification for test failures
+	if len(report.SmokeTests) > 0 {
+		go func() {
+			// Send separately to avoid rate limiting
+			time.Sleep(1 * time.Second)
+			d.sendDetailedTestResults(context.Background(), report)
+		}()
+	}
+
 	return embed
+}
+
+// sendDetailedTestResults sends detailed smoke test results in a separate message
+func (d *DiscordSender) sendDetailedTestResults(ctx context.Context, report *types.Report) {
+	if len(report.SmokeTests) == 0 {
+		return
+	}
+
+	// Create embed with detailed test results
+	fields := []map[string]interface{}{}
+	for _, test := range report.SmokeTests {
+		statusEmoji := "✅"
+		if test.Status != "pass" {
+			statusEmoji = "❌"
+		}
+		fields = append(fields, map[string]interface{}{
+			"name":  fmt.Sprintf("%s %s (%s)", statusEmoji, test.Name, test.Type),
+			"value": fmt.Sprintf("Status: %s\nMessage: %s\nDuration: %dms\nSeverity: %s", test.Status, test.Message, test.Duration, test.Severity),
+		})
+	}
+
+	embed := map[string]interface{}{
+		"title":     "Detailed Smoke Test Results",
+		"color":     0x0099FF,
+		"fields":    fields,
+		"timestamp": report.Timestamp.Format(time.RFC3339),
+	}
+
+	payload := map[string]interface{}{
+		"embeds": []interface{}{embed},
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", d.webhookURL, bytes.NewReader(data))
+	if err != nil {
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	_, _ = d.httpClient.Do(req)
 }
 
 // colorForStatus returns Discord embed color for status
