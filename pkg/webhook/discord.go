@@ -272,9 +272,12 @@ func (d *DiscordSender) formatEmbed(report *types.Report) map[string]interface{}
 		"timestamp":   report.Timestamp.Format(time.RFC3339),
 	}
 
-	// Replace description with AI-generated summary if available
+	// Replace description with AI-generated summary if available (truncated to 4000 chars)
 	if report.Analysis != nil {
 		if aiSummary, ok := report.Analysis["health_summary"].(string); ok && aiSummary != "" {
+			if len(aiSummary) > 4000 {
+				aiSummary = aiSummary[:4000] + "\n... (truncated)"
+			}
 			embed["description"] = aiSummary
 		}
 	}
