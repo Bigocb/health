@@ -73,7 +73,7 @@ func (l *LLMClient) Analyze(ctx context.Context, prompt string) (string, error) 
 func (l *LLMClient) callAPI(ctx context.Context, prompt string) (string, error) {
 	url := fmt.Sprintf("%s/api/generate", l.endpoint)
 
-	systemPrompt := "You are an expert Kubernetes cluster health analyst. Your responses should be detailed (at least 500 words), data-driven, and include specific numbers from the metrics provided. Always format your response with clear sections and bullet points. Do not give brief summaries."
+	systemPrompt := "You are a precise Kubernetes cluster health analyst. You ONLY reference data that is explicitly provided. You do NOT invent metrics or services. When uncertain, you say DATA_NOT_PROVIDED. Your goal is accuracy, not length."
 
 	fullPrompt := fmt.Sprintf("System: %s\n\nUser: %s", systemPrompt, prompt)
 
@@ -81,9 +81,9 @@ func (l *LLMClient) callAPI(ctx context.Context, prompt string) (string, error) 
 		"model":      l.model,
 		"prompt":     fullPrompt,
 		"stream":     false,
-		"max_tokens": 4096,
+		"max_tokens": 2048,
 		"options": map[string]interface{}{
-			"temperature": 0.7,
+			"temperature": 0.2,
 		},
 	}
 
@@ -162,31 +162,46 @@ func (l *LLMClient) GenerateEnhancedPrompt(metrics, trends, anomalies, smokeTest
 	_ = logContext // Included in metrics
 	_ = podDetails // Included in metrics
 
-	return fmt.Sprintf(`Analyze this Kubernetes cluster and provide a detailed health report.
+	return fmt.Sprintf(`You are a Kubernetes cluster health analyst. Analyze ONLY the provided data.
 
-## Cluster Metrics
+CRITICAL RULES:
+- ONLY reference metrics explicitly provided below
+- Do NOT invent, assume, or hallucinate any data
+- Do NOT mention services/components not in the provided metrics
+- If data is missing or unclear, say "DATA_NOT_PROVIDED" instead of guessing
+- Use EXACT numbers from the data - do not round or estimate
+
+## Provided Cluster Metrics
 %s
 
-## Trends
+## Recent Trends (if available)
 %s
 
-## Smoke Tests
+## Smoke Tests (if available)
 %s
 
-## Status: %s
+## Current Status: %s
 
-## Required Sections:
-1. Executive Summary (2-3 paragraphs with specific numbers)
-2. Health Score (EXCELLENT/GOOD/DEGRADED/CRITICAL with justification)
-3. Key Metrics (Nodes, Pods, CPU, Memory, Disk, Deployments, Jobs, PVCs)
-4. Issues Found (list each with severity and count)
-5. Failed/Pending Pods (names if available, causes)
-6. Smoke Test Results (pass/fail summary)
-7. Trends Analysis (what's changing)
-8. Recommendations (5 specific actions)
-9. Risk Outlook (24-48hr prediction)
+## Your Task:
+Provide analysis in exactly these 3 sections:
 
-Provide detailed responses with specific numbers from the data.`, metrics, trends, smokeTests, status)
+### 1. Executive Summary (2-3 sentences MAX)
+Describe the current cluster health status using ONLY the metrics above. Reference specific numbers.
+
+### 2. Critical Issues (if any)
+List ONLY issues that are explicitly shown in the metrics. Format: "Issue Name: specific number/detail"
+If no issues, write: "No issues identified in provided metrics."
+
+### 3. Recommendations (3 specific actions)
+Based ONLY on the issues identified above, suggest 3 concrete actions.
+Example format: "Monitor [specific metric] as it is at [number]"
+
+## Validation:
+Before responding, verify:
+- Every number you mention exists in the provided metrics ✓
+- You have not mentioned any service not in the data ✓
+- Your statements are supported by the data ✓
+- You said "DATA_NOT_PROVIDED" for any missing data ✓`, metrics, trends, smokeTests, status)
 }
 
 func (l *LLMClient) IsAvailable(ctx context.Context) bool {

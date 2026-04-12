@@ -65,6 +65,8 @@ analysis:
     endpoint: "http://ollama.ollama.svc.cluster.local:11434"
     timeoutSeconds: 120
     maxRetries: 2
+    temperature: 0.2
+    maxTokens: 2048
 
 # Resource limits for the single deployment
 resources:

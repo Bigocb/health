@@ -175,7 +175,7 @@ func main() {
 }
 
 func runReport(reporter *health.Reporter) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 
 	report, err := reporter.Generate(ctx)

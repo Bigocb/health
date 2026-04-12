@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(kubectl get:*)",
+      "Bash(kubectl exec:*)",
+      "Bash(curl -s http://ollama.ollama.svc.cluster.local:11434/api/tags)",
+      "Bash(kubectl logs:*)",
+      "Bash(kubectl describe:*)",
+      "Bash(helm list:*)",
+      "Bash(helm upgrade:*)",
+      "Bash(kubectl rollout:*)",
+      "Bash(docker build:*)",
+      "Bash(docker push:*)"
+    ]
+  }
+}

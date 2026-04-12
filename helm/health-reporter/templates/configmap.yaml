@@ -56,3 +56,9 @@ data:
         endpoint: {{ .Values.analysis.llm.endpoint | quote }}
         timeout_seconds: {{ .Values.analysis.llm.timeoutSeconds }}
         max_retries: {{ .Values.analysis.llm.maxRetries }}
+        {{- if .Values.analysis.llm.temperature }}
+        temperature: {{ .Values.analysis.llm.temperature }}
+        {{- end }}
+        {{- if .Values.analysis.llm.maxTokens }}
+        max_tokens: {{ .Values.analysis.llm.maxTokens }}
+        {{- end }}
