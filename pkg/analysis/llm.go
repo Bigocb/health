@@ -132,39 +132,41 @@ func (l *LLMClient) GenerateEnhancedPrompt(metrics, trends, anomalies, smokeTest
 ## Overall Status: %s
 
 ## Your Task
-Generate a comprehensive cluster health report in markdown format. Include:
+Generate a detailed cluster health report. Write at least 3-4 sentences for EACH section. Use this exact format:
 
 ### 🎯 Executive Summary
-2-3 sentences overview.
+[Detailed 3-4 sentence overview of cluster state]
 
 ### 📊 Health Score
-EXCELLENT / GOOD / DEGRADED / CRITICAL
+[EXCELLENT/GOOD/DEGRADED/CRITICAL] - [one line justification]
 
-### 📈 Key Metrics
-- Nodes (ready/total/unschedulable)
-- Pods (running/pending/failed/restarts)
-- CPU, Memory, Disk usage
-- Deployments (ready/unready)
-- Jobs (active/failed/succeeded)
-- Services (total/clusterIP/loadbalancer)
-- Storage PVCs (bound/pending/lost)
+### 📈 Key Metrics Breakdown
+- Nodes: [details]
+- Pods: [details with running/pending/failed counts]
+- CPU: [usage % and context]
+- Memory: [usage % and context]
+- Disk: [usage %]
+- Deployments: [ready/total]
+- Jobs: [status breakdown]
+- Services: [counts]
+- PVCs: [status]
 
-### 🔍 Issues Found
-List with severity badge.
+### 🚨 Issues & Alerts
+[List each issue with severity: high/medium/low and explanation]
 
-### ✅ Smoke Tests
-Pass/fail summary by type.
+### ✅ Smoke Tests Summary
+[Pass/fail counts with any failures highlighted]
 
-### 📉 Trends
-Any significant changes.
+### 📉 Trend Analysis
+[What the trends show - increasing/decreasing/stable for each metric]
 
-### 💡 Recommendations
-3-5 prioritized actions.
+### 🔧 Recommendations
+Provide numbered list of 5 specific actions to improve cluster health
 
 ### ⚠️ Risk Outlook
-24-48 hour prediction.
+[24-48 hour prediction based on trends]
 
-Format: Clean emoji-rich markdown for Discord.`, metrics, trends, anomalies, smokeTests, status)
+IMPORTANT: Write substantial content for each section. Do not use placeholder text.`, metrics, trends, anomalies, smokeTests, status)
 }
 
 func (l *LLMClient) IsAvailable(ctx context.Context) bool {
