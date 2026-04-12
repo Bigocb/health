@@ -183,10 +183,10 @@ func runReport(reporter *health.Reporter) error {
 		return fmt.Errorf("failed to generate report: %w", err)
 	}
 
-	// Run analysis if configured (Phase 1 + Phase 2 LLM calls) - 5 minute timeout
+	// Run analysis if configured (Phase 1 + Phase 2 LLM calls) - 8 minute timeout
 	var analysis *analysis.AnalysisResult
 	if reporter.HasAnalyzer() {
-		analyzeCtx, analyzeCancel := context.WithTimeout(context.Background(), 300*time.Second)
+		analyzeCtx, analyzeCancel := context.WithTimeout(context.Background(), 480*time.Second)
 		analysis = reporter.Analyze(analyzeCtx, report)
 		analyzeCancel()
 		if analysis != nil {
