@@ -71,19 +71,20 @@ func (l *LLMClient) Analyze(ctx context.Context, prompt string) (string, error) 
 }
 
 func (l *LLMClient) callAPI(ctx context.Context, prompt string) (string, error) {
-	url := fmt.Sprintf("%s/api/chat", l.endpoint)
+	url := fmt.Sprintf("%s/api/generate", l.endpoint)
 
 	systemPrompt := "You are an expert Kubernetes cluster health analyst. Your responses should be detailed (at least 500 words), data-driven, and include specific numbers from the metrics provided. Always format your response with clear sections and bullet points. Do not give brief summaries."
 
-	reqBody := LLMRequest{
-		Model: l.model,
-		Messages: []Message{
-			{Role: "system", Content: systemPrompt},
-			{Role: "user", Content: prompt},
+	fullPrompt := fmt.Sprintf("System: %s\n\nUser: %s", systemPrompt, prompt)
+
+	reqBody := map[string]interface{}{
+		"model":      l.model,
+		"prompt":     fullPrompt,
+		"stream":     false,
+		"max_tokens": 4096,
+		"options": map[string]interface{}{
+			"temperature": 0.7,
 		},
-		Stream:      false,
-		MaxTokens:   4096,
-		Temperature: 0.7,
 	}
 
 	data, err := json.Marshal(reqBody)
@@ -113,7 +114,7 @@ func (l *LLMClient) callAPI(ctx context.Context, prompt string) (string, error) 
 
 	if resp.StatusCode == 404 {
 		log.Printf("[LLM] Model %s not found, retrying with llama3.2:1b", l.model)
-		reqBody.Model = "llama3.2:1b"
+		reqBody["model"] = "llama3.2:1b"
 		data, _ = json.Marshal(reqBody)
 		req, _ = http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(data))
 		req.Header.Set("Content-Type", "application/json")
@@ -129,20 +130,17 @@ func (l *LLMClient) callAPI(ctx context.Context, prompt string) (string, error) 
 		return "", fmt.Errorf("LLM returned status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
-	var llmResp ChatResponse
-	if err := json.Unmarshal(bodyBytes, &llmResp); err != nil {
+	var genResp struct {
+		Response string `json:"response"`
+	}
+	if err := json.Unmarshal(bodyBytes, &genResp); err != nil {
 		log.Printf("[LLM] Raw response: %.500s", string(bodyBytes))
 		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	if len(llmResp.Choices) == 0 {
-		return "", fmt.Errorf("no response choices from LLM")
-	}
+	log.Printf("[LLM] Response received, length: %d chars, first 200 chars: %.200s", len(genResp.Response), genResp.Response)
 
-	response := llmResp.Choices[0].Message.Content
-	log.Printf("[LLM] Response received, length: %d chars, first 200 chars: %.200s", len(response), response)
-
-	return response, nil
+	return genResp.Response, nil
 }
 
 func (l *LLMClient) GenerateAnalysisPrompt(currentReport string, trends string, anomalies string) string {
