@@ -16,24 +16,24 @@ spec:
   expectedStatus: 200
   tlsInsecure: true
 
----
-apiVersion: health.archipelago.ai/v1alpha1
-kind: SmokeTest
-metadata:
-  name: kubelet-health
-  namespace: monitoring
-  labels:
-    app: health-reporter
-    test-type: http
-spec:
-  type: http
-  enabled: true
-  severity: critical
-  timeout: "5s"
-  interval: "2m"
-  url: "https://localhost:10250/healthz"
-  expectedStatus: 200
-  tlsInsecure: true
+# apiVersion: health.archipelago.ai/v1alpha1
+# kind: SmokeTest
+# metadata:
+#   name: kubelet-health
+#   namespace: monitoring
+#   labels:
+#     app: health-reporter
+#     test-type: http
+# spec:
+#   type: http
+#   enabled: true
+#   severity: critical
+#   timeout: "5s"
+#   interval: "2m"
+#   url: "https://localhost:10250/healthz"
+#   expectedStatus: 200
+#   tlsInsecure: true
+# kubelet runs as static pod on each node - not accessible via service
 
 ---
 apiVersion: health.archipelago.ai/v1alpha1
@@ -85,7 +85,7 @@ spec:
   severity: critical
   timeout: "5s"
   interval: "2m"
-  url: "http://mimir-nginx.monitoring.svc:80/prometheus Ready"
+  url: "http://mimir-nginx.monitoring.svc:80/ready"
   method: GET
   expectedStatus: 200
 
@@ -125,20 +125,20 @@ spec:
   url: "http://minio.monitoring.svc:9000/minio/health/live"
   expectedStatus: 200
 
----
-apiVersion: health.archipelago.ai/v1alpha1
-kind: SmokeTest
-metadata:
-  name: ingress-nginx
-  namespace: monitoring
-  labels:
-    app: health-reporter
-    test-type: http
-spec:
-  type: http
-  enabled: true
-  severity: high
-  timeout: "5s"
-  interval: "2m"
-  url: "http://ingress-nginx-controller.ingress-nginx.svc:10246/healthz"
-  expectedStatus: 200
+# apiVersion: health.archipelago.ai/v1alpha1
+# kind: SmokeTest
+# metadata:
+#   name: ingress-nginx
+#   namespace: monitoring
+#   labels:
+#     app: health-reporter
+#     test-type: http
+# spec:
+#   type: http
+#   enabled: true
+#   severity: high
+#   timeout: "5s"
+#   interval: "2m"
+#   url: "http://ingress-nginx-controller.ingress-nginx.svc:10246/healthz"
+#   expectedStatus: 200
+# Using Higress instead - see config/samples/higress_test.yaml

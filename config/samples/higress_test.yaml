@@ -1,0 +1,16 @@
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: higress-gateway
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: http
+spec:
+  type: http
+  enabled: true
+  severity: critical
+  timeout: "5s"
+  interval: "2m"
+  url: "http://higress-gateway.higress-system.svc:80/healthz"
+  expectedStatus: 200
