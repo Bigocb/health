@@ -24,7 +24,7 @@ import (
 	"github.com/ArchipelagoAI/health-reporter/pkg/webhook"
 )
 
-const version = "0.3.0"
+const version = "0.4.0"
 
 func main() {
 	var (
@@ -161,7 +161,7 @@ func main() {
 }
 
 func runReport(reporter *health.Reporter) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
 	report, err := reporter.Generate(ctx)
@@ -169,7 +169,16 @@ func runReport(reporter *health.Reporter) error {
 		return fmt.Errorf("failed to generate report: %w", err)
 	}
 
-	if err := reporter.SendReport(ctx, report); err != nil {
+	// Run analysis if configured
+	var analysis *analysis.AnalysisResult
+	if reporter.HasAnalyzer() {
+		analysis = reporter.Analyze(ctx, report)
+		if analysis != nil {
+			log.Printf("analysis: %s (confidence: %.2f)", analysis.HealthSummary, analysis.ConfidenceScore)
+		}
+	}
+
+	if err := reporter.SendReportWithAnalysis(ctx, report, analysis); err != nil {
 		return fmt.Errorf("failed to send report: %w", err)
 	}
 

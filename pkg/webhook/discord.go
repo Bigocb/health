@@ -238,6 +238,24 @@ func (d *DiscordSender) formatEmbed(report *types.Report) map[string]interface{}
 		})
 	}
 
+	// Add analysis section if available
+	if report.Analysis != nil {
+		if summary, ok := report.Analysis["health_summary"].(string); ok && summary != "" {
+			fields = append(fields, map[string]interface{}{
+				"name":   "AI Analysis",
+				"value":  summary,
+				"inline": false,
+			})
+		}
+		if confidence, ok := report.Analysis["confidence_score"].(float64); ok && confidence > 0 {
+			fields = append(fields, map[string]interface{}{
+				"name":   "Analysis Confidence",
+				"value":  fmt.Sprintf("%.0f%%", confidence*100),
+				"inline": true,
+			})
+		}
+	}
+
 	embed := map[string]interface{}{
 		"title":       fmt.Sprintf("Cluster Health Report - %s", report.Status),
 		"description": report.Summary,

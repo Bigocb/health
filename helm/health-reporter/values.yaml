@@ -42,17 +42,17 @@ storage:
 
 # Analysis configuration
 analysis:
-  enabled: false  # Enable for trend analysis
+  enabled: true
   timeoutSeconds: 30
   trends:
     windowHours: 24
     anomalyThreshold: 1.5
     minDataPoints: 6
   llm:
-    enabled: false
+    enabled: true
     provider: "ollama"
     model: "llama3.2:1b"
-    endpoint: "http://ollama:11434"
+    endpoint: "http://ollama.ollama.svc.cluster.local:11434"
     timeoutSeconds: 15
     maxRetries: 2
 

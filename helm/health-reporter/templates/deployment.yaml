@@ -74,7 +74,6 @@ spec:
           readOnly: true
         - name: reports
           mountPath: /var/lib/health-reporter/reports
-          readWrite: true
         
         livenessProbe:
           exec:

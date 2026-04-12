@@ -23,6 +23,7 @@ type Report struct {
 	Concerns        []Concern              `json:"concerns,omitempty"`
 	Recommendations []string               `json:"recommendations,omitempty"`
 	SmokeTests      []SmokeTestResult      `json:"smoke_tests,omitempty"`
+	Analysis        map[string]interface{} `json:"analysis,omitempty"`
 }
 
 // SmokeTestResult represents the result of a smoke test

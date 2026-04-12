@@ -156,6 +156,23 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 	return result
 }
 
+func (r *Reporter) HasAnalyzer() bool {
+	return r.analyzer != nil
+}
+
+func (r *Reporter) SendReportWithAnalysis(ctx context.Context, report *types.Report, analysis *analysis.AnalysisResult) error {
+	if analysis != nil {
+		report.Analysis = map[string]interface{}{
+			"health_summary":   analysis.HealthSummary,
+			"confidence_score": analysis.ConfidenceScore,
+			"trends":           analysis.Trends,
+			"anomalies":        analysis.Anomalies,
+			"predictions":      analysis.Predictions,
+		}
+	}
+	return r.sender.Send(ctx, report)
+}
+
 func (r *Reporter) SendReport(ctx context.Context, report *types.Report) error {
 	return r.sender.Send(ctx, report)
 }
