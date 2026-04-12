@@ -24,6 +24,12 @@ mimir:
   username: ""
   password: ""
 
+# Loki configuration (optional - for log analysis)
+loki:
+  url: "http://loki.monitoring.svc.cluster.local:3100"
+  username: ""
+  password: ""
+
 # Discord webhook configuration
 discord:
   webhookUrl: ""

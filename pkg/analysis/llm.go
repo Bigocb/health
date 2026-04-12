@@ -114,7 +114,12 @@ func (l *LLMClient) GenerateAnalysisPrompt(currentReport string, trends string, 
 Generate a brief health summary.`, currentReport, trends, anomalies)
 }
 
-func (l *LLMClient) GenerateEnhancedPrompt(metrics, trends, anomalies, smokeTests, status string) string {
+func (l *LLMClient) GenerateEnhancedPrompt(metrics, trends, anomalies, smokeTests, status, logContext string) string {
+	logSection := ""
+	if logContext != "" {
+		logSection = fmt.Sprintf("\n## Log Context\n%s", logContext)
+	}
+
 	return fmt.Sprintf(`You are a Kubernetes cluster health analyst and DevOps expert. Generate a comprehensive health report.
 
 ## Cluster Metrics (JSON)
@@ -130,6 +135,7 @@ func (l *LLMClient) GenerateEnhancedPrompt(metrics, trends, anomalies, smokeTest
 %s
 
 ## Overall Status: %s
+%s
 
 ## Your Task
 Generate a detailed cluster health report. Write at least 3-4 sentences for EACH section. Use this exact format:
@@ -152,7 +158,7 @@ Generate a detailed cluster health report. Write at least 3-4 sentences for EACH
 - PVCs: [status]
 
 ### 🚨 Issues & Alerts
-[List each issue with severity: high/medium/low and explanation]
+[List each issue with severity: high/medium/low and explanation - use log context to identify root causes]
 
 ### ✅ Smoke Tests Summary
 [Pass/fail counts with any failures highlighted]
@@ -166,7 +172,7 @@ Provide numbered list of 5 specific actions to improve cluster health
 ### ⚠️ Risk Outlook
 [24-48 hour prediction based on trends]
 
-IMPORTANT: Write substantial content for each section. Do not use placeholder text.`, metrics, trends, anomalies, smokeTests, status)
+IMPORTANT: Write substantial content for each section. Do not use placeholder text.`, metrics, trends, anomalies, smokeTests, status, logSection)
 }
 
 func (l *LLMClient) IsAvailable(ctx context.Context) bool {

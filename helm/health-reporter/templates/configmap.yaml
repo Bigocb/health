@@ -19,6 +19,17 @@ data:
       password: {{ .Values.mimir.password | quote }}
       {{- end }}
     
+    {{- if .Values.loki.url }}
+    loki:
+      url: {{ .Values.loki.url | quote }}
+      {{- if .Values.loki.username }}
+      username: {{ .Values.loki.username | quote }}
+      {{- end }}
+      {{- if .Values.loki.password }}
+      password: {{ .Values.loki.password | quote }}
+      {{- end }}
+    {{- end }}
+    
     discord: {}
     
     health:

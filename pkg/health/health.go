@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ArchipelagoAI/health-reporter/pkg/analysis"
+	"github.com/ArchipelagoAI/health-reporter/pkg/loki"
 	"github.com/ArchipelagoAI/health-reporter/pkg/mimir"
 	"github.com/ArchipelagoAI/health-reporter/pkg/smoke_tests"
 	"github.com/ArchipelagoAI/health-reporter/pkg/storage"
@@ -23,6 +24,7 @@ type Concern struct {
 
 type Reporter struct {
 	mimirClient  *mimir.Client
+	lokiClient   *loki.Client
 	sender       webhook.Sender
 	testRegistry smoke_tests.TestRegistry
 	historyMgr   *storage.HistoryManager
@@ -51,6 +53,10 @@ func NewReporter(mimirClient *mimir.Client, sender webhook.Sender) *Reporter {
 
 func (r *Reporter) SetTestRegistry(registry smoke_tests.TestRegistry) {
 	r.testRegistry = registry
+}
+
+func (r *Reporter) SetLokiClient(client *loki.Client) {
+	r.lokiClient = client
 }
 
 func (r *Reporter) SetHistoryManager(mgr *storage.HistoryManager) {
@@ -179,6 +185,12 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 
 	result := r.analyzer.Analyze(ctx, report, historicalReports)
 
+	// Get Loki logs for additional context
+	var logContext string
+	if r.lokiClient != nil && r.lokiClient.IsAvailable(ctx) {
+		logContext = r.getLogContext(ctx, report)
+	}
+
 	if r.llmClient != nil && r.llmClient.IsAvailable(ctx) {
 		metricsJSON, _ := json.Marshal(report.ClusterMetrics)
 		smokeTestsJSON, _ := json.Marshal(report.SmokeTests)
@@ -189,6 +201,7 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 			fmt.Sprintf("%+v", result.Anomalies),
 			string(smokeTestsJSON),
 			string(report.Status),
+			logContext,
 		)
 
 		if llmAnalysis, err := r.llmClient.Analyze(ctx, enhancedPrompt); err == nil {
@@ -197,6 +210,52 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 	}
 
 	return result
+}
+
+func (r *Reporter) getLogContext(ctx context.Context, report *types.Report) string {
+	var context string
+
+	// Get failed pod errors first (most important)
+	podsFailed := 0
+	if pods, ok := report.ClusterMetrics["pods"].(map[string]interface{}); ok {
+		if failed, ok := pods["failed"].(float64); ok {
+			podsFailed = int(failed)
+		}
+	}
+
+	if podsFailed > 0 {
+		failedPodErrors, err := r.lokiClient.GetFailedPodsErrors(ctx)
+		if err == nil && len(failedPodErrors) > 0 {
+			context += fmt.Sprintf("\n## Failed Pod Logs (%d pods)\n", podsFailed)
+			for pod, errors := range failedPodErrors {
+				if len(errors) > 0 {
+					context += fmt.Sprintf("\n### %s\n", pod)
+					for _, err := range errors {
+						context += fmt.Sprintf("- %s\n", err)
+					}
+				}
+			}
+		}
+	}
+
+	// Get recent errors from Loki
+	errors, err := r.lokiClient.GetRecentErrors(ctx, 1*time.Hour)
+	if err == nil && errors != nil {
+		if errors.TotalErrors > 0 {
+			context += fmt.Sprintf("\n## Recent Log Errors (1h)\n")
+			context += fmt.Sprintf("Total errors in last hour: %d\n", errors.TotalErrors)
+			if len(errors.TopErrors) > 0 {
+				context += "Sample errors:\n"
+				for i, err := range errors.TopErrors {
+					if i < 3 {
+						context += fmt.Sprintf("- %s\n", err)
+					}
+				}
+			}
+		}
+	}
+
+	return context
 }
 
 func (r *Reporter) HasAnalyzer() bool {

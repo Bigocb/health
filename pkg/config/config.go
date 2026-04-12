@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	Mimir    MimirConfig    `yaml:"mimir"`
+	Loki     LokiConfig     `yaml:"loki"`
 	Discord  DiscordConfig  `yaml:"discord"`
 	Health   HealthConfig   `yaml:"health"`
 	Storage  StorageConfig  `yaml:"storage"`
@@ -16,6 +17,12 @@ type Config struct {
 }
 
 type MimirConfig struct {
+	URL      string `yaml:"url"`
+	Username string `yaml:"username,omitempty"`
+	Password string `yaml:"password,omitempty"`
+}
+
+type LokiConfig struct {
 	URL      string `yaml:"url"`
 	Username string `yaml:"username,omitempty"`
 	Password string `yaml:"password,omitempty"`

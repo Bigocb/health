@@ -18,6 +18,7 @@ import (
 	"github.com/ArchipelagoAI/health-reporter/pkg/analysis"
 	"github.com/ArchipelagoAI/health-reporter/pkg/config"
 	"github.com/ArchipelagoAI/health-reporter/pkg/health"
+	"github.com/ArchipelagoAI/health-reporter/pkg/loki"
 	"github.com/ArchipelagoAI/health-reporter/pkg/mimir"
 	"github.com/ArchipelagoAI/health-reporter/pkg/smoke_tests"
 	"github.com/ArchipelagoAI/health-reporter/pkg/storage"
@@ -72,6 +73,13 @@ func main() {
 	}
 	defer mimirClient.Close()
 
+	// Initialize Loki client if configured
+	var lokiClient *loki.Client
+	if cfg.Loki.URL != "" {
+		lokiClient = loki.NewClient(cfg.Loki.URL, cfg.Loki.Username, cfg.Loki.Password)
+		log.Printf("loki: %s", cfg.Loki.URL)
+	}
+
 	webhookSender := webhook.NewDiscordSender(cfg.Discord.WebhookURL)
 
 	// Create shared test registry — the single source of truth for smoke tests.
@@ -85,6 +93,12 @@ func main() {
 	// Initialize storage for historical reports
 	historyMgr := storage.NewHistoryManager(cfg.Storage.ReportsDirectory, cfg.Storage.RetentionHours)
 	reporter.SetHistoryManager(historyMgr)
+
+	// Set Loki client if configured
+	if lokiClient != nil {
+		reporter.SetLokiClient(lokiClient)
+		log.Printf("Loki client configured for log analysis")
+	}
 
 	// Initialize trend analyzer
 	if cfg.Analysis.Enabled {
