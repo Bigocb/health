@@ -194,6 +194,7 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 	if r.llmClient != nil && r.llmClient.IsAvailable(ctx) {
 		metricsJSON, _ := json.Marshal(report.ClusterMetrics)
 		smokeTestsJSON, _ := json.Marshal(report.SmokeTests)
+		podDetails := r.getPodDetails(ctx, report)
 
 		enhancedPrompt := r.llmClient.GenerateEnhancedPrompt(
 			string(metricsJSON),
@@ -202,6 +203,7 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 			string(smokeTestsJSON),
 			string(report.Status),
 			logContext,
+			podDetails,
 		)
 
 		if llmAnalysis, err := r.llmClient.Analyze(ctx, enhancedPrompt); err == nil {
@@ -256,6 +258,54 @@ func (r *Reporter) getLogContext(ctx context.Context, report *types.Report) stri
 	}
 
 	return context
+}
+
+func (r *Reporter) getPodDetails(ctx context.Context, report *types.Report) string {
+	var details string
+
+	// Get failed pods
+	podsFailed := 0
+	if pods, ok := report.ClusterMetrics["pods"].(map[string]interface{}); ok {
+		if failed, ok := pods["failed"].(float64); ok {
+			podsFailed = int(failed)
+		}
+	}
+
+	if podsFailed > 0 && r.lokiClient != nil {
+		failedPodErrors, err := r.lokiClient.GetFailedPodsErrors(ctx)
+		if err == nil && len(failedPodErrors) > 0 {
+			details += "## Failed Pods\n"
+			for pod, errors := range failedPodErrors {
+				details += fmt.Sprintf("- **%s**: ", pod)
+				if len(errors) > 0 {
+					details += errors[0]
+				} else {
+					details += "No recent errors in logs"
+				}
+				details += "\n"
+			}
+		}
+	}
+
+	// Get pending pods info
+	podsPending := 0
+	if pods, ok := report.ClusterMetrics["pods"].(map[string]interface{}); ok {
+		if pending, ok := pods["pending"].(float64); ok {
+			podsPending = int(pending)
+		}
+	}
+
+	if podsPending > 0 {
+		details += "\n## Pending Pods\n"
+		details += fmt.Sprintf("- %d pods in Pending state - likely due to resource constraints or scheduling issues\n", podsPending)
+		details += "- Run `kubectl get pods -A --field-selector=status.phase=Pending` to see details\n"
+	}
+
+	if details == "" {
+		details = "No failed or pending pods detected."
+	}
+
+	return details
 }
 
 func (r *Reporter) HasAnalyzer() bool {

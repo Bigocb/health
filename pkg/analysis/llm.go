@@ -114,10 +114,15 @@ func (l *LLMClient) GenerateAnalysisPrompt(currentReport string, trends string, 
 Generate a brief health summary.`, currentReport, trends, anomalies)
 }
 
-func (l *LLMClient) GenerateEnhancedPrompt(metrics, trends, anomalies, smokeTests, status, logContext string) string {
+func (l *LLMClient) GenerateEnhancedPrompt(metrics, trends, anomalies, smokeTests, status, logContext, podDetails string) string {
 	logSection := ""
 	if logContext != "" {
 		logSection = fmt.Sprintf("\n## Log Context\n%s", logContext)
+	}
+
+	podSection := ""
+	if podDetails != "" {
+		podSection = fmt.Sprintf("\n## Pod Details\n%s", podDetails)
 	}
 
 	return fmt.Sprintf(`You are a Kubernetes cluster health analyst and DevOps expert. Generate a comprehensive health report.
@@ -135,7 +140,7 @@ func (l *LLMClient) GenerateEnhancedPrompt(metrics, trends, anomalies, smokeTest
 %s
 
 ## Overall Status: %s
-%s
+%s%s
 
 ## Your Task
 Generate a detailed cluster health report. Write at least 3-4 sentences for EACH section. Use this exact format:
@@ -149,9 +154,9 @@ Generate a detailed cluster health report. Write at least 3-4 sentences for EACH
 ### 📈 Key Metrics Breakdown
 - Nodes: [details]
 - Pods: [details with running/pending/failed counts]
-- CPU: [usage % and context]
-- Memory: [usage % and context]
-- Disk: [usage %]
+- CPU: [usage and context]
+- Memory: [usage and context]
+- Disk: [usage]
 - Deployments: [ready/total]
 - Jobs: [status breakdown]
 - Services: [counts]
@@ -160,11 +165,23 @@ Generate a detailed cluster health report. Write at least 3-4 sentences for EACH
 ### 🚨 Issues & Alerts
 [List each issue with severity: high/medium/low and explanation - use log context to identify root causes]
 
+### 🔴 Failed Pods
+[If there are failed pods, list their names and namespaces, and suggest diagnostic commands]
+
+### ⏳ Pending Pods
+[If there are pending pods, list their names and namespaces, and suggest causes (resources, scheduling, etc.)]
+
 ### ✅ Smoke Tests Summary
 [Pass/fail counts with any failures highlighted]
 
 ### 📉 Trend Analysis
 [What the trends show - increasing/decreasing/stable for each metric]
+
+### 🛠️ Diagnostic Commands
+[Provide specific kubectl commands to investigate issues like:
+- kubectl get pods -A --field-selector=status.phase=Failed
+- kubectl describe pod <pod-name> -n <namespace>
+- kubectl logs <pod-name> -n <namespace> --previous]
 
 ### 🔧 Recommendations
 Provide numbered list of 5 specific actions to improve cluster health
@@ -172,7 +189,7 @@ Provide numbered list of 5 specific actions to improve cluster health
 ### ⚠️ Risk Outlook
 [24-48 hour prediction based on trends]
 
-IMPORTANT: Write substantial content for each section. Do not use placeholder text.`, metrics, trends, anomalies, smokeTests, status, logSection)
+IMPORTANT: Write substantial content for each section. Do not use placeholder text.`, metrics, trends, anomalies, smokeTests, status, logSection, podSection)
 }
 
 func (l *LLMClient) IsAvailable(ctx context.Context) bool {
