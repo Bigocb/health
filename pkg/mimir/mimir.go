@@ -179,13 +179,13 @@ func (c *Client) queryNodeMetrics(ctx context.Context, m *Metrics) error {
 // queryPodMetrics queries pod status from Mimir
 func (c *Client) queryPodMetrics(ctx context.Context, m *Metrics) error {
 	queries := map[string]string{
-		"running_pods":   `count(kube_pod_status_phase{phase="Running"})`,
+		"running_pods":   `count(kube_pod_status_phase{phase="Running"} == 1)`,
 		"total_pods":     `count(kube_pod_info)`,
-		"pending_pods":   `count(kube_pod_status_phase{phase="Pending"})`,
-		"failed_pods":    `count(kube_pod_status_phase{phase="Failed"})`,
-		"succeeded_pods": `count(kube_pod_status_phase{phase="Succeeded"})`,
+		"pending_pods":   `count(kube_pod_status_phase{phase="Pending"} == 1)`,
+		"failed_pods":    `count(kube_pod_status_phase{phase="Failed"} == 1)`,
+		"succeeded_pods": `count(kube_pod_status_phase{phase="Succeeded"} == 1)`,
 		"restarts_1h":    `sum(increase(kube_pod_container_status_restarts_total[1h]))`,
-		"unschedulable":  `count(kube_pod_status_phase{phase="Pending"} > 0 and kube_pod_condition{condition="PodScheduled",status="false"} > 0)`,
+		"unschedulable":  `count(kube_pod_status_phase{phase="Pending"} == 1 and kube_pod_condition{condition="PodScheduled",status="false"} == 1)`,
 	}
 
 	results, err := c.queryRange(ctx, queries)
@@ -231,8 +231,8 @@ func (c *Client) queryJobMetrics(ctx context.Context, m *Metrics) error {
 	queries := map[string]string{
 		"total_jobs":     `count(kube_job_labels)`,
 		"active_jobs":    `count(kube_job_status_active == 1)`,
-		"failed_jobs":    `count(kube_job_status_failed > 0)`,
-		"succeeded_jobs": `count(kube_job_status_succeeded > 0)`,
+		"failed_jobs":    `count(kube_job_status_failed == 1)`,
+		"succeeded_jobs": `count(kube_job_status_succeeded == 1)`,
 	}
 
 	results, err := c.queryRange(ctx, queries)
@@ -274,9 +274,9 @@ func (c *Client) queryServiceMetrics(ctx context.Context, m *Metrics) error {
 func (c *Client) queryStorageMetrics(ctx context.Context, m *Metrics) error {
 	queries := map[string]string{
 		"total_pvcs":   `count(kube_persistentvolumeclaim_info)`,
-		"bound_pvcs":   `count(kube_persistentvolumeclaim_status_phase{phase="Bound"})`,
-		"pending_pvcs": `count(kube_persistentvolumeclaim_status_phase{phase="Pending"})`,
-		"lost_pvcs":    `count(kube_persistentvolumeclaim_status_phase{phase="Lost"})`,
+		"bound_pvcs":   `count(kube_persistentvolumeclaim_status_phase{phase="Bound"} == 1)`,
+		"pending_pvcs": `count(kube_persistentvolumeclaim_status_phase{phase="Pending"} == 1)`,
+		"lost_pvcs":    `count(kube_persistentvolumeclaim_status_phase{phase="Lost"} == 1)`,
 	}
 
 	results, err := c.queryRange(ctx, queries)
