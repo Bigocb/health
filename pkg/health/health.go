@@ -193,7 +193,13 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 	}
 
 	if r.llmClient != nil && r.llmClient.IsAvailable(ctx) {
+		// Debug: log the raw metrics structure
+		metricsJSON, _ := json.Marshal(report.ClusterMetrics)
+		log.Printf("DEBUG: ClusterMetrics raw: %s", string(metricsJSON))
+
 		metricsText := r.formatMetricsAsText(report.ClusterMetrics)
+		log.Printf("DEBUG: Formatted metrics:\n%s", metricsText)
+
 		smokeTestsJSON, _ := json.Marshal(report.SmokeTests)
 		podDetails := r.getPodDetails(ctx, report)
 
