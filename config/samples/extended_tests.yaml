@@ -68,7 +68,7 @@ spec:
   severity: high
   timeout: "15s"
   interval: "2m"
-  url: "http://grafana.monitoring.svc:3000/api/health"
+  url: "http://grafana.monitoring.svc:80/api/health"
   expectedStatus: 200
 
 ---
@@ -86,7 +86,7 @@ spec:
   severity: critical
   timeout: "10s"
   interval: "2m"
-  url: "http://mimir-nginx.monitoring.svc:80/readyz"
+  url: "http://mimir-nginx.monitoring.svc:80/"
   method: GET
   expectedStatus: 200
 
@@ -103,9 +103,9 @@ spec:
   type: http
   enabled: true
   severity: high
-  timeout: "5s"
+  timeout: "15s"
   interval: "2m"
-  url: "http://argocd-server.argocd.svc:8080/health"
+  url: "http://argocd-server.argocd.svc:80/"
   expectedStatus: 200
 
 ---

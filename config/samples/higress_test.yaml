@@ -12,5 +12,5 @@ spec:
   severity: critical
   timeout: "10s"
   interval: "2m"
-  url: "http://higress-gateway.higress-system.svc:80/ready"
+  url: "http://higress-gateway.higress-system.svc:80/"
   expectedStatus: 200

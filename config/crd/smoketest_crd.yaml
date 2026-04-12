@@ -94,6 +94,10 @@ spec:
                   type: object
                   additionalProperties:
                     type: string
+                useServiceAccountToken:
+                  description: Use pod's service account token for authentication
+                  type: boolean
+                  default: false
                 # TCP fields
                 host:
                   description: Host to connect to (for TCP tests)
