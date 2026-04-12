@@ -98,7 +98,6 @@ func (l *LLMClient) callAPI(ctx context.Context, prompt string) (string, error) 
 
 	req.Header.Set("Content-Type", "application/json")
 
-	// Debug: log request
 	log.Printf("[LLM] Request to %s with model %s, prompt length %d", url, l.model, len(prompt))
 
 	resp, err := l.httpClient.Do(req)
@@ -107,14 +106,27 @@ func (l *LLMClient) callAPI(ctx context.Context, prompt string) (string, error) 
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("LLM returned status %d: %s", resp.StatusCode, string(body))
-	}
-
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode == 404 {
+		log.Printf("[LLM] Model %s not found, retrying with llama3.2:1b", l.model)
+		reqBody.Model = "llama3.2:1b"
+		data, _ = json.Marshal(reqBody)
+		req, _ = http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(data))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err = l.httpClient.Do(req)
+		if err != nil {
+			return "", fmt.Errorf("fallback request failed: %w", err)
+		}
+		defer resp.Body.Close()
+		bodyBytes, _ = io.ReadAll(resp.Body)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("LLM returned status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	var llmResp ChatResponse
