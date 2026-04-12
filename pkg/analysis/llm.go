@@ -354,6 +354,7 @@ func (l *LLMClient) IsAvailable(ctx context.Context) bool {
 // ValidatePhase1Response applies server-side threshold enforcement to Phase 1 LLM output
 // This corrects any misclassifications by the LLM and ensures strict threshold rules are applied
 func ValidatePhase1Response(jsonStr string) string {
+	log.Printf("[VALIDATOR] Starting validation of Phase 1 response (length: %d chars)", len(jsonStr))
 	thresholds := DefaultThresholds()
 
 	var response struct {
