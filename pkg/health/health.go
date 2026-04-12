@@ -495,9 +495,12 @@ func (r *Reporter) formatMetricsAsText(metrics map[string]interface{}) string {
 	if nodes, ok := metrics["nodes"].(map[string]interface{}); ok {
 		fmt.Printf("[formatMetricsAsText] nodes map found with keys: %v\n", getMapKeys(nodes))
 		buf.WriteString("  nodes:\n")
+		fmt.Printf("[formatMetricsAsText] checking nodes.total, raw value: %T = %v\n", nodes["total"], nodes["total"])
 		if v := getIntValue(nodes["total"]); v >= 0 {
 			fmt.Printf("[formatMetricsAsText] nodes.total = %d\n", v)
 			buf.WriteString(fmt.Sprintf("    total: %d\n", v))
+		} else {
+			fmt.Printf("[formatMetricsAsText] getIntValue returned %d\n", v)
 		}
 		if v := getIntValue(nodes["ready"]); v >= 0 {
 			buf.WriteString(fmt.Sprintf("    ready: %d\n", v))
