@@ -20,9 +20,11 @@ type LLMClient struct {
 }
 
 type LLMRequest struct {
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
-	Stream bool   `json:"stream"`
+	Model       string  `json:"model"`
+	Prompt      string  `json:"prompt"`
+	Stream      bool    `json:"stream"`
+	MaxTokens   int     `json:"max_tokens"`  // Limit response length
+	Temperature float64 `json:"temperature"` // Control randomness
 }
 
 type LLMResponse struct {
@@ -63,9 +65,11 @@ func (l *LLMClient) callAPI(ctx context.Context, prompt string) (string, error) 
 	url := fmt.Sprintf("%s/api/generate", l.endpoint)
 
 	reqBody := LLMRequest{
-		Model:  l.model,
-		Prompt: prompt,
-		Stream: false,
+		Model:       l.model,
+		Prompt:      prompt,
+		Stream:      false,
+		MaxTokens:   4096, // Allow full response
+		Temperature: 0.7,  // Balanced creativity/factuality
 	}
 
 	data, err := json.Marshal(reqBody)
