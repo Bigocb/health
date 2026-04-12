@@ -495,60 +495,60 @@ func (r *Reporter) formatMetricsAsText(metrics map[string]interface{}) string {
 	if nodes, ok := metrics["nodes"].(map[string]interface{}); ok {
 		fmt.Printf("[formatMetricsAsText] nodes map found with keys: %v\n", getMapKeys(nodes))
 		buf.WriteString("  nodes:\n")
-		if v, ok := nodes["total"].(float64); ok {
-			fmt.Printf("[formatMetricsAsText] nodes.total = %f\n", v)
-			buf.WriteString(fmt.Sprintf("    total: %d\n", int(v)))
+		if v := getIntValue(nodes["total"]); v >= 0 {
+			fmt.Printf("[formatMetricsAsText] nodes.total = %d\n", v)
+			buf.WriteString(fmt.Sprintf("    total: %d\n", v))
 		}
-		if v, ok := nodes["ready"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("    ready: %d\n", int(v)))
+		if v := getIntValue(nodes["ready"]); v >= 0 {
+			buf.WriteString(fmt.Sprintf("    ready: %d\n", v))
 		}
-		if v, ok := nodes["not_ready"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("    not_ready: %d\n", int(v)))
+		if v := getIntValue(nodes["not_ready"]); v >= 0 {
+			buf.WriteString(fmt.Sprintf("    not_ready: %d\n", v))
 		}
-		if v, ok := nodes["unschedulable"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("    unschedulable: %d\n", int(v)))
+		if v := getIntValue(nodes["unschedulable"]); v >= 0 {
+			buf.WriteString(fmt.Sprintf("    unschedulable: %d\n", v))
 		}
 	}
 
 	// Pods
 	if pods, ok := metrics["pods"].(map[string]interface{}); ok {
 		buf.WriteString("  pods:\n")
-		if v, ok := pods["total"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("    total: %d\n", int(v)))
+		if v := getIntValue(pods["total"]); v >= 0 {
+			buf.WriteString(fmt.Sprintf("    total: %d\n", v))
 		}
-		if v, ok := pods["running"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("    running: %d\n", int(v)))
+		if v := getIntValue(pods["running"]); v >= 0 {
+			buf.WriteString(fmt.Sprintf("    running: %d\n", v))
 		}
-		if v, ok := pods["pending"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("    pending: %d\n", int(v)))
+		if v := getIntValue(pods["pending"]); v >= 0 {
+			buf.WriteString(fmt.Sprintf("    pending: %d\n", v))
 		}
-		if v, ok := pods["failed"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("    failed: %d\n", int(v)))
+		if v := getIntValue(pods["failed"]); v >= 0 {
+			buf.WriteString(fmt.Sprintf("    failed: %d\n", v))
 		}
-		if v, ok := pods["succeeded"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("    succeeded: %d\n", int(v)))
+		if v := getIntValue(pods["succeeded"]); v >= 0 {
+			buf.WriteString(fmt.Sprintf("    succeeded: %d\n", v))
 		}
-		if v, ok := pods["restarts"].(float64); ok {
-			buf.WriteString(fmt.Sprintf("    restarts_1h: %d\n", int(v)))
+		if v := getIntValue(pods["restarts"]); v >= 0 {
+			buf.WriteString(fmt.Sprintf("    restarts_1h: %d\n", v))
 		}
 	}
 
 	// Resources
 	if resources, ok := metrics["resources"].(map[string]interface{}); ok {
 		buf.WriteString("  resources:\n")
-		if v, ok := resources["cpu_usage_percent"].(float64); ok {
+		if v := getFloatValue(resources["cpu_usage_percent"]); v >= 0 {
 			buf.WriteString(fmt.Sprintf("    cpu_usage_percent: %.1f\n", v))
 		}
-		if v, ok := resources["memory_usage_percent"].(float64); ok {
+		if v := getFloatValue(resources["memory_usage_percent"]); v >= 0 {
 			buf.WriteString(fmt.Sprintf("    memory_usage_percent: %.1f\n", v))
 		}
-		if v, ok := resources["disk_usage_percent"].(float64); ok {
+		if v := getFloatValue(resources["disk_usage_percent"]); v >= 0 {
 			buf.WriteString(fmt.Sprintf("    disk_usage_percent: %.1f\n", v))
 		}
-		if v, ok := resources["available_memory_gb"].(float64); ok {
+		if v := getFloatValue(resources["available_memory_gb"]); v >= 0 {
 			buf.WriteString(fmt.Sprintf("    available_memory_gb: %.0f\n", v))
 		}
-		if v, ok := resources["available_storage_gb"].(float64); ok {
+		if v := getFloatValue(resources["available_storage_gb"]); v >= 0 {
 			buf.WriteString(fmt.Sprintf("    available_storage_gb: %.0f\n", v))
 		}
 	}
@@ -563,4 +563,34 @@ func getMapKeys(m map[string]interface{}) []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// getIntValue converts a value to int, handling both int and float64 types
+// Returns -1 if the value cannot be converted
+func getIntValue(v interface{}) int {
+	switch val := v.(type) {
+	case int:
+		return val
+	case float64:
+		return int(val)
+	case float32:
+		return int(val)
+	default:
+		return -1
+	}
+}
+
+// getFloatValue converts a value to float64, handling int, float64, and float32 types
+// Returns -1 if the value cannot be converted
+func getFloatValue(v interface{}) float64 {
+	switch val := v.(type) {
+	case float64:
+		return val
+	case float32:
+		return float64(val)
+	case int:
+		return float64(val)
+	default:
+		return -1
+	}
 }
