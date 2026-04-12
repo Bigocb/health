@@ -292,25 +292,27 @@ func (l *LLMClient) GenerateNarrativePrompt(dataAnalysisJSON string, smokeTests 
 %s
 
 ## Your Task: Generate Executive Report
-Using ONLY the issues flagged in the structured analysis, provide exactly 3 sections:
+Using ONLY the issues flagged in the structured analysis, provide exactly 3 sections.
+INCORPORATE smoke test results and log samples when relevant to each section.
 
 ### 1. Executive Summary (2-3 sentences)
-Summarize cluster health. If issues were flagged, mention them with specific values. Otherwise, state the cluster is operating normally.
+Summarize cluster health. If issues were flagged, mention them with specific values. Reference smoke test status (passed/failed). Otherwise, state the cluster is operating normally.
 
 ### 2. Critical Issues
 List ONLY flagged issues with:
 - Issue Name
 - Current Value (exact number)
 - Severity
+- Relevant log samples or error context from the logs provided above (if applicable)
 
-If none flagged, write: "No critical issues identified."
+If none flagged, write: "No critical issues identified. Smoke tests: [status]"
 
 ### 3. Recommendations
 Provide 3 specific actions:
-- If issues flagged: Focus on resolving them
-- If no issues: Proactive maintenance suggestions
+- If issues flagged: Focus on resolving them using log context and smoke test failures as guidance
+- If no issues: Proactive maintenance suggestions considering smoke test results
 
-Format: "Monitor [specific metric] at [value] because [reason]"`, dataAnalysisJSON, smokeTests, logContext)
+Format each recommendation with: "[Action] because [reason from metrics/logs/tests]"`, dataAnalysisJSON, smokeTests, logContext)
 }
 
 func (l *LLMClient) IsAvailable(ctx context.Context) bool {
