@@ -90,24 +90,36 @@ func (d *DiscordSender) formatEmbed(report *types.Report) map[string]interface{}
 	if cm, ok := report.ClusterMetrics["nodes"].(map[string]interface{}); ok {
 		if v, ok := cm["ready"].(float64); ok {
 			nodesReady = int(v)
+		} else if v, ok := cm["ready"].(int); ok {
+			nodesReady = v
 		}
 		if v, ok := cm["total"].(float64); ok {
 			nodesTotal = int(v)
+		} else if v, ok := cm["total"].(int); ok {
+			nodesTotal = v
 		}
 	}
 
 	if cm, ok := report.ClusterMetrics["pods"].(map[string]interface{}); ok {
 		if v, ok := cm["running"].(float64); ok {
 			podsRunning = int(v)
+		} else if v, ok := cm["running"].(int); ok {
+			podsRunning = v
 		}
 		if v, ok := cm["pending"].(float64); ok {
 			podsPending = int(v)
+		} else if v, ok := cm["pending"].(int); ok {
+			podsPending = v
 		}
 		if v, ok := cm["failed"].(float64); ok {
 			podsFailed = int(v)
+		} else if v, ok := cm["failed"].(int); ok {
+			podsFailed = v
 		}
 		if v, ok := cm["restarts"].(float64); ok {
 			podRestarts = int(v)
+		} else if v, ok := cm["restarts"].(int); ok {
+			podRestarts = v
 		}
 	}
 
