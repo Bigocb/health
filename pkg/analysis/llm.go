@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 )
@@ -43,14 +44,15 @@ func NewLLMClient(endpoint, model string, timeoutSeconds, maxRetries int) *LLMCl
 }
 
 func (l *LLMClient) Analyze(ctx context.Context, prompt string) (string, error) {
-	if cached, ok := l.promptCache[prompt]; ok {
-		return cached, nil
-	}
+	// Disabled prompt caching - was causing short responses to be reused
+	// if cached, ok := l.promptCache[prompt]; ok {
+	// 	return cached, nil
+	// }
 
 	var lastErr error
 	for i := 0; i < l.maxRetries; i++ {
 		resp, err := l.callAPI(ctx, prompt)
-		if err == nil {
+		if err == nil && len(resp) > 10 { // Only cache non-empty responses
 			l.promptCache[prompt] = resp
 			return resp, nil
 		}
@@ -68,8 +70,8 @@ func (l *LLMClient) callAPI(ctx context.Context, prompt string) (string, error) 
 		Model:       l.model,
 		Prompt:      prompt,
 		Stream:      false,
-		MaxTokens:   4096, // Allow full response
-		Temperature: 0.7,  // Balanced creativity/factuality
+		MaxTokens:   4096,
+		Temperature: 0.7,
 	}
 
 	data, err := json.Marshal(reqBody)
@@ -84,6 +86,9 @@ func (l *LLMClient) callAPI(ctx context.Context, prompt string) (string, error) 
 
 	req.Header.Set("Content-Type", "application/json")
 
+	// Debug: log request
+	log.Printf("[LLM] Request to %s with model %s, prompt length %d", url, l.model, len(prompt))
+
 	resp, err := l.httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("request failed: %w", err)
@@ -95,23 +100,19 @@ func (l *LLMClient) callAPI(ctx context.Context, prompt string) (string, error) 
 		return "", fmt.Errorf("LLM returned status %d: %s", resp.StatusCode, string(body))
 	}
 
-	// Read full response body for debugging
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	// Try to parse and see what we get
 	var llmResp LLMResponse
 	if err := json.Unmarshal(bodyBytes, &llmResp); err != nil {
-		// Log the actual response for debugging
-		fmt.Printf("[DEBUG] LLM response raw: %.500s\n", string(bodyBytes))
+		log.Printf("[LLM] Raw response: %.500s", string(bodyBytes))
 		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	if llmResp.Response == "" {
-		fmt.Printf("[DEBUG] LLM response empty, raw: %.500s\n", string(bodyBytes))
-	}
+	// Debug: log response length
+	log.Printf("[LLM] Response received, length: %d chars, first 200 chars: %.200s", len(llmResp.Response), llmResp.Response)
 
 	return llmResp.Response, nil
 }
