@@ -61,9 +61,9 @@ analysis:
   llm:
     enabled: true
     provider: "ollama"
-    model: "phi3.5:3.8b"
+    model: "mistral:7b"
     endpoint: "http://ollama.ollama.svc.cluster.local:11434"
-    timeoutSeconds: 90
+    timeoutSeconds: 120
     maxRetries: 2
 
 # Resource limits for the single deployment
