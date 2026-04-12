@@ -367,7 +367,7 @@ func correctMarkdownStatuses(markdown string, thresholds HealthThresholds) strin
 	// Find all metric lines and correct the status
 
 	// CPU Usage line
-	result, corrected := correctMetricStatus(result, "CPU Usage:", "(%", "→ \\*\\*([a-z]+)\\*\\*", func(value float64) string {
+	result, corrected := correctMetricStatus(result, "CPU Usage:", "%", func(value float64) string {
 		return thresholds.CPU.EvaluateStatus(value)
 	})
 	if corrected {
@@ -375,7 +375,7 @@ func correctMarkdownStatuses(markdown string, thresholds HealthThresholds) strin
 	}
 
 	// Memory Usage line
-	result, corrected = correctMetricStatus(result, "Memory Usage:", "(%", "→ \\*\\*([a-z]+)\\*\\*", func(value float64) string {
+	result, corrected = correctMetricStatus(result, "Memory Usage:", "%", func(value float64) string {
 		return thresholds.Memory.EvaluateStatus(value)
 	})
 	if corrected {
@@ -383,15 +383,15 @@ func correctMarkdownStatuses(markdown string, thresholds HealthThresholds) strin
 	}
 
 	// Disk Usage line
-	result, corrected = correctMetricStatus(result, "Disk Usage:", "(%", "→ \\*\\*([a-z]+)\\*\\*", func(value float64) string {
+	result, corrected = correctMetricStatus(result, "Disk Usage:", "%", func(value float64) string {
 		return thresholds.Disk.EvaluateStatus(value)
 	})
 	if corrected {
 		correctedCount++
 	}
 
-	// Failed Pods line (0=good, 1-5=elevated, 6+=critical)
-	result, corrected = correctMetricStatus(result, "Failed:", "", "→ \\*\\*([a-z]+)\\*\\*", func(value float64) string {
+	// Failed Pods count
+	result, corrected = correctMetricStatus(result, "Failed:", "", func(value float64) string {
 		if value == 0 {
 			return "good"
 		} else if value <= 5 {
@@ -410,30 +410,32 @@ func correctMarkdownStatuses(markdown string, thresholds HealthThresholds) strin
 }
 
 // correctMetricStatus finds a metric line, extracts value, applies threshold, and corrects status
-func correctMetricStatus(text, metricLabel, valueSuffix, statusPattern string, evaluateFunc func(float64) string) (string, bool) {
+func correctMetricStatus(text, metricLabel, valueSuffix string, evaluateFunc func(float64) string) (string, bool) {
 	// Find the line containing the metric
 	lines := strings.Split(text, "\n")
 	for i, line := range lines {
 		if strings.Contains(line, metricLabel) {
 			// Extract the numeric value from this line
-			// Pattern: "Metric Name: {value}{suffix}"
+			// Pattern: "- Metric Name: {value}{suffix} → **{status}**"
 			idx := strings.Index(line, metricLabel)
 			if idx == -1 {
 				continue
 			}
 			afterLabel := line[idx+len(metricLabel):]
 
-			// Find the number before the suffix
-			parts := strings.Fields(afterLabel)
-			if len(parts) == 0 {
+			// Find the number in the afterLabel (e.g., " 16.0% →")
+			// Look for digits (possibly with decimal point)
+			re := regexp.MustCompile(`\s*([\d.]+)` + regexp.QuoteMeta(valueSuffix) + `\s*→`)
+			matches := re.FindStringSubmatch(afterLabel)
+			if len(matches) < 2 {
+				log.Printf("[VALIDATOR] DEBUG: Could not extract value from line: %s", line)
 				continue
 			}
 
-			valueStr := strings.TrimSpace(parts[0])
-			valueStr = strings.TrimSuffix(valueStr, valueSuffix)
-
+			valueStr := matches[1]
 			value, err := strconv.ParseFloat(valueStr, 64)
 			if err != nil {
+				log.Printf("[VALIDATOR] DEBUG: Could not parse value '%s': %v", valueStr, err)
 				continue
 			}
 
@@ -442,14 +444,14 @@ func correctMetricStatus(text, metricLabel, valueSuffix, statusPattern string, e
 
 			// Replace the old status with the correct one in this line
 			// Find pattern "→ **old_status**" and replace with "→ **correct_status**"
-			re := regexp.MustCompile(`→\s*\*\*([a-z]+)\*\*`)
-			matches := re.FindStringSubmatchIndex(line)
-			if matches != nil {
-				oldStatus := line[matches[2]:matches[3]]
+			statusRe := regexp.MustCompile(`→\s*\*\*([a-z]+)\*\*`)
+			oldMatches := statusRe.FindStringSubmatchIndex(line)
+			if oldMatches != nil {
+				oldStatus := line[oldMatches[2]:oldMatches[3]]
 				if oldStatus != correctStatus {
-					line = re.ReplaceAllString(line, fmt.Sprintf("→ **%s**", correctStatus))
+					line = statusRe.ReplaceAllString(line, fmt.Sprintf("→ **%s**", correctStatus))
 					lines[i] = line
-					log.Printf("[VALIDATOR] %s: %.1f - corrected from '%s' to '%s'", metricLabel, value, oldStatus, correctStatus)
+					log.Printf("[VALIDATOR] %s: %.1f%s - corrected from '%s' to '%s'", metricLabel, value, valueSuffix, oldStatus, correctStatus)
 					return strings.Join(lines, "\n"), true
 				}
 			}
