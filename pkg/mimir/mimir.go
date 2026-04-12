@@ -181,8 +181,8 @@ func (c *Client) queryPodMetrics(ctx context.Context, m *Metrics) error {
 	queries := map[string]string{
 		"running_pods":   `count(kube_pod_status_phase{phase="Running"})`,
 		"total_pods":     `count(kube_pod_info)`,
-		"pending_pods":   `count(kube_pod_status_phase{phase="Pending"})`,
-		"failed_pods":    `count(kube_pod_status_phase{phase="Failed"})`,
+		"pending_pods":   `count(kube_pod_status_phase{phase="Pending"} == 1)`,
+		"failed_pods":    `count(kube_pod_status_phase{phase="Failed"} == 1)`,
 		"succeeded_pods": `count(kube_pod_status_phase{phase="Succeeded"})`,
 		"restarts_1h":    `sum(increase(kube_pod_container_status_restarts_total[1h]))`,
 		"unschedulable":  `count(kube_pod_status_phase{phase="Pending"} and kube_pod_condition{condition="PodScheduled",status="false"})`,
