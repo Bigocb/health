@@ -193,12 +193,7 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 	}
 
 	if r.llmClient != nil && r.llmClient.IsAvailable(ctx) {
-		// Debug: log the raw metrics structure
-		metricsJSON, _ := json.Marshal(report.ClusterMetrics)
-		log.Printf("DEBUG: ClusterMetrics raw: %s", string(metricsJSON))
-
 		metricsText := r.formatMetricsAsText(report.ClusterMetrics)
-		log.Printf("DEBUG: Formatted metrics:\n%s", metricsText)
 
 		smokeTestsJSON, _ := json.Marshal(report.SmokeTests)
 		podDetails := r.getPodDetails(ctx, report)
@@ -488,19 +483,13 @@ func (r *Reporter) generateRecommendations(report *types.Report) []string {
 
 func (r *Reporter) formatMetricsAsText(metrics map[string]interface{}) string {
 	var buf bytes.Buffer
-	fmt.Printf("[formatMetricsAsText] called with metrics keys: %v\n", getMapKeys(metrics))
 	buf.WriteString("cluster_metrics:\n")
 
 	// Nodes
 	if nodes, ok := metrics["nodes"].(map[string]interface{}); ok {
-		fmt.Printf("[formatMetricsAsText] nodes map found with keys: %v\n", getMapKeys(nodes))
 		buf.WriteString("  nodes:\n")
-		fmt.Printf("[formatMetricsAsText] checking nodes.total, raw value: %T = %v\n", nodes["total"], nodes["total"])
 		if v := getIntValue(nodes["total"]); v >= 0 {
-			fmt.Printf("[formatMetricsAsText] nodes.total = %d\n", v)
 			buf.WriteString(fmt.Sprintf("    total: %d\n", v))
-		} else {
-			fmt.Printf("[formatMetricsAsText] getIntValue returned %d\n", v)
 		}
 		if v := getIntValue(nodes["ready"]); v >= 0 {
 			buf.WriteString(fmt.Sprintf("    ready: %d\n", v))
