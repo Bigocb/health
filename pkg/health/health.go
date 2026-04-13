@@ -333,19 +333,47 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 		classifiedMetrics := analysis.ClassifyMetrics(cpuPercent, memPercent, diskPercent)
 		healthStatus := analysis.DetermineHealthStatus(classifiedMetrics)
 
+		// Classify per-node metrics
+		var perNodeClassifications []analysis.PerNodeClassification
+		for _, node := range report.NodeMetrics {
+			nodeClass := analysis.ClassifyPerNodeMetrics(node.Name, node.CPUUsagePercent, node.MemoryUsagePercent)
+			perNodeClassifications = append(perNodeClassifications, nodeClass)
+		}
+
+		// Build per-node classifications text
+		perNodeText := "### Per-Node Classifications\n"
+		for _, nodeClass := range perNodeClassifications {
+			unschedulableStr := ""
+			for _, n := range report.NodeMetrics {
+				if n.Name == nodeClass.NodeName && n.Unschedulable {
+					unschedulableStr = " (Unschedulable)"
+					break
+				}
+			}
+			perNodeText += fmt.Sprintf("- %s: CPU %.1f%% [%s], Memory %.1f%% [%s]%s\n",
+				nodeClass.NodeName,
+				nodeClass.CPU.Value, nodeClass.CPU.Status,
+				nodeClass.Memory.Value, nodeClass.Memory.Status,
+				unschedulableStr)
+		}
+
 		// Format classified metrics for Phase 1 to explain
 		classifiedMetricsText := fmt.Sprintf(`## Server-Side Metric Classifications (Do NOT change these)
 Overall Health: %s
 
+### Cluster Metrics
 - CPU Usage: %.1f%% [%s]
 - Memory Usage: %.1f%% [%s]
 - Disk Usage: %.1f%% [%s]
+
+%s
 
 Your task: Analyze logs to explain WHY metrics are at these levels.`,
 			healthStatus,
 			classifiedMetrics["cpu"].Value, classifiedMetrics["cpu"].Status,
 			classifiedMetrics["memory"].Value, classifiedMetrics["memory"].Status,
-			classifiedMetrics["disk"].Value, classifiedMetrics["disk"].Status)
+			classifiedMetrics["disk"].Value, classifiedMetrics["disk"].Status,
+			perNodeText)
 
 		// Phase 1: Log Analysis ONLY (LLM analyzes logs, no metric classification)
 		dataAnalysisPrompt := r.llmClient.GenerateDataAnalysisPrompt(
