@@ -262,44 +262,49 @@ CRITICAL: You MUST use ALL provided data including logs:
    - Error spikes = Specific events (deployment, traffic surge, dependency failure)
 
 ## Your Task: Classify Each Metric Using EXACT THRESHOLDS + Log Evidence
-CRITICAL: Apply these EXACT thresholds. Do not deviate.
+CRITICAL: Apply these EXACT thresholds. Do not deviate. Use ONLY these classifications:
 
-**Memory Usage Classification:**
-- If value < 75: status = good
-- If value >= 75 and < 90: status = elevated
-- If value >= 90: status = critical
+**Memory Usage Classification (EXACT):**
+- If value < 75: **good**
+- If value >= 75 and < 90: **elevated**
+- If value >= 90: **critical**
 
-**CPU Usage Classification:**
-- If value < 70: status = good
-- If value >= 70 and < 85: status = elevated
-- If value >= 85: status = critical
+**CPU Usage Classification (EXACT):**
+- If value < 70: **good**
+- If value >= 70 and < 85: **elevated**
+- If value >= 85: **critical**
 
-**Disk Usage Classification:**
-- If value < 80: status = good
-- If value >= 80 and < 95: status = elevated
-- If value >= 95: status = critical
+**Disk Usage Classification (EXACT):**
+- If value < 80: **good**
+- If value >= 80 and < 95: **elevated**
+- If value >= 95: **critical**
+
+MANDATORY: You MUST follow these thresholds exactly. If CPU is 26%, you MUST output "good" not "elevated". Do not make your own judgments about severity.
 
 ## CRITICAL: RESPONSE FORMAT
-DO NOT OUTPUT JSON. Output ONLY plain markdown text.
+Output ONLY plain markdown text. NO JSON, NO OTHER FORMATS.
 
-FIRST LINE AFTER ANALYSIS: Output this exact format:
+Start your response with this exact line:
 ### Overall Health: [healthy/degraded/critical]
 
-Then continue with other sections below.
+Then immediately output the Metrics Summary section in EXACT format (copy this exactly, replacing XX values):
 
 ### Metrics Summary
-- CPU Usage: XX.X%% → **status**
-- Memory Usage: XX.X%% → **status**
-- Disk Usage: XX.X%% → **status**
+- CPU Usage: XX.X% → **status**
+- Memory Usage: XX.X% → **status**
+- Disk Usage: XX.X% → **status**
 - Available Memory: XXX GB
 - Available Storage: XXX GB
 - Nodes Total: X (Ready: X, Unschedulable: X)
 - Pods Total: X (Running: X, Failed: X, Pending: X)
 
 ### Per-Node Health
-[Include ALL nodes with detailed metrics and status]
-- nodename: CPU=XX.X%% → **status**, Memory=XX.X%% → **status**, Available=XXXGB, Pods=XX
-- Example: node-1: CPU=75.2%% → **elevated**, Memory=82.0%% → **elevated**, Available=8.5GB, Pods=28
+Copy this format EXACTLY for each node. Apply thresholds STRICTLY:
+- nodename: CPU=XX.X% → **status**, Memory=XX.X% → **status**, Available=XXXGB, Pods=XX
+EXAMPLES (follow these exactly):
+- node-1: CPU=75.2% → **elevated**, Memory=82.0% → **elevated**, Available=8.5GB, Pods=28
+- app01: CPU=26.0% → **good**, Memory=28.0% → **good**, Available=3.0GB, Pods=6
+- internal: CPU=19.0% → **good**, Memory=19.0% → **good**, Available=102.0GB, Pods=68
 
 ### Log Analysis & Root Causes
 [MUST INCLUDE THIS SECTION if logs are provided]
