@@ -229,68 +229,44 @@ Minimal. One line if metrics are fine. Only add detail if problems exist.`, clas
 
 // GenerateNarrativePrompt creates a prompt for Phase 2: narrative generation based on structured analysis
 func (l *LLMClient) GenerateNarrativePrompt(dataAnalysisJSON string, smokeTests string, logContext string) string {
-	return fmt.Sprintf(`You are a Kubernetes cluster health analyst. Based on deep analysis including logs, generate a comprehensive narrative report.
+	return fmt.Sprintf(`You are a Kubernetes cluster health analyst. Generate a concise executive report based on Phase 1 analysis and smoke tests.
 
 ## CRITICAL INSTRUCTIONS
-- **FIRST: Extract Phase 1's health status from line: "### Overall Health: [healthy/degraded/critical]"**
-- **USE that status directly in your Executive Summary - do NOT change it**
-- Do NOT make your own health classification - use Phase 1's determination
-- DEEPLY INCORPORATE provided logs and error context
-- Research log patterns to explain WHY issues occur
+- **Extract Phase 1's health status from line: "### Overall Health: [healthy/degraded/critical]"**
+- **USE that status directly - do NOT change it**
+- Do NOT make your own health classification
 - Do NOT invent metrics or thresholds
-- Reference actual error messages and patterns from logs
-- Connect metrics to log evidence for credibility
+- Reference only the metrics and smoke tests provided
 
-## Phase 1 Structured Analysis (Includes Log Context)
+## Phase 1 Analysis
 %s
 
 ## Smoke Tests Status
 %s
 
-## Log Context (For Root Cause Explanation)
-%s
+## Your Task: Generate Executive Report
 
-## Your Task: Generate Executive Report with Deep Analysis
+**Use Phase 1's health determination. Do NOT override it.**
 
-**CRITICAL: Use Phase 1's overall health determination. Do NOT make your own health classification.**
+### 1. Executive Summary (2-3 sentences)
+Start with: "The cluster is currently in a **[HEALTH_STATUS]** state" (from Phase 1).
+Then describe the current state:
+- If healthy: "All metrics within acceptable ranges. Smoke tests passing."
+- If degraded/critical: "Some metrics elevated. Describe which ones and smoke test status."
 
-You MUST reference logs and explain root causes based on error patterns.
+### 2. Current State
+List the key metrics from Phase 1:
+- Cluster-wide CPU, Memory, Disk status
+- Per-node status if any nodes have elevated metrics
+- Smoke test results
 
-### 1. Executive Summary (2-3 sentences, with log evidence)
-Start with: "The cluster is currently in a **[HEALTH_STATUS]** state" where [HEALTH_STATUS] is the status from Phase 1 analysis.
-Then add:
-- If issues flagged: Mention specific values, reference log evidence, include smoke test impact
-- If healthy: "All smoke tests passing. Cluster operating normally."
-DO NOT override Phase 1's health determination.
-
-### 2. Critical Issues (Deep Analysis Required)
-FIRST: Check Phase 1's "### Flagged Issues" section.
-- If Phase 1 flagged issues: For EACH flagged issue from Phase 1:
-  - Issue Name and Value (from Phase 1)
-  - Severity (from Phase 1)
-  - **Root Cause Analysis** (MUST use logs):
-    - What error messages appear in logs?
-    - Are these application crashes, resource constraints, or infrastructure issues?
-    - Do errors concentrate on specific pods/nodes?
-    - What is the timing pattern (continuous, intermittent, spikes)?
-  - Impact: How does this affect cluster/services?
-- If Phase 1 flagged NO issues:
-  "No critical issues identified. All smoke tests passing. Cluster operating normally."
-
-### 3. Recommendations
-Provide 3-4 specific, actionable recommendations:
-- Based on log error patterns and root causes
-- Reference specific log entries or error types
-- If smoke tests failed, explain how to resolve
-- If pod crashes: check application logs for panic/error
-- If resource issues: provide capacity planning guidance
-
-Format each recommendation:
-"[Action] because [specific reason from logs/metrics/tests]"
-Example: "Review application logs for OOMKilled pods because Memory Usage is 92% and logs show memory allocation failures"
+### 3. Recommendations (if any issues)
+If Phase 1 shows [elevated] or [critical] metrics:
+- Provide 2-3 specific, actionable recommendations
+- Base them on the metric values shown
 
 ## Output Format
-Plain text, NOT JSON. Include all sections.`, dataAnalysisJSON, smokeTests, logContext)
+Plain text. Keep it concise and fact-based.`, dataAnalysisJSON, smokeTests)
 }
 
 func (l *LLMClient) IsAvailable(ctx context.Context) bool {
