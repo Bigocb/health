@@ -150,8 +150,29 @@ func (r *Reporter) Generate(ctx context.Context) (*types.Report, error) {
 	}
 
 	// Convert per-node metrics from mimir to types.NodeMetrics
-	if len(metrics.NodeDetails) > 0 {
-		for _, detail := range metrics.NodeDetails {
+	// If mimir queries failed, try to use cached metrics instead
+	nodeMetricsToUse := metrics.NodeDetails
+	if len(nodeMetricsToUse) == 0 && r.cache != nil {
+		// Fallback to cache if live metrics failed
+		cachedMetrics := r.cache.GetLatestMetrics()
+		if cachedMetrics != nil && len(cachedMetrics.NodeMetrics) > 0 {
+			// Convert cache node metrics to mimir NodeDetail format
+			for _, cached := range cachedMetrics.NodeMetrics {
+				nodeMetricsToUse = append(nodeMetricsToUse, mimir.NodeDetail{
+					Name:               cached.NodeName,
+					Ready:              cached.Ready,
+					Unschedulable:      cached.Unschedulable,
+					CPUUsagePercent:    cached.CPUUsagePercent,
+					MemoryUsagePercent: cached.MemoryUsagePercent,
+					AvailableMemoryGB:  cached.AvailableMemoryGB,
+					PodCount:           cached.PodCount,
+				})
+			}
+		}
+	}
+
+	if len(nodeMetricsToUse) > 0 {
+		for _, detail := range nodeMetricsToUse {
 			report.NodeMetrics = append(report.NodeMetrics, types.NodeMetrics{
 				Name:               detail.Name,
 				Ready:              detail.Ready,
