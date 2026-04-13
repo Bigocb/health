@@ -384,11 +384,11 @@ Your task: Analyze logs to explain WHY metrics are at these levels.`,
 			classifiedMetrics["disk"].Value, classifiedMetrics["disk"].Status,
 			perNodeText)
 
-		// Phase 1: Log Analysis ONLY (LLM analyzes logs, no metric classification)
+		// Phase 1: TEMPORARY - Disable log input, process deterministic metrics only
 		dataAnalysisPrompt := r.llmClient.GenerateDataAnalysisPrompt(
 			classifiedMetricsText,
 			fmt.Sprintf("%+v", result.Trends),
-			logContext,
+			"", // Temporarily disabled - testing metrics-only output
 		)
 
 		// Prepare Phase 1 result (we'll build this from server-side classifications)

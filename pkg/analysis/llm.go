@@ -208,35 +208,19 @@ Before responding, verify:
 }
 
 // GenerateDataAnalysisPrompt creates a prompt for Phase 1: structured data analysis with thresholds
-// Now includes log context for deep correlation analysis
+// TEMPORARY: Metrics-only version (logs disabled for refinement)
 func (l *LLMClient) GenerateDataAnalysisPrompt(classifiedMetrics string, trends string, logContext string) string {
-	return fmt.Sprintf(`You are a Kubernetes cluster health analyst. Analyze logs to provide ROOT CAUSE analysis.
+	return fmt.Sprintf(`You are a Kubernetes cluster health analyst.
 
-## Server-Side Metric Classifications (FIXED - Do NOT interpret or change)
+## Deterministic Metric Classifications
 %s
 
-## Your Task: Analyze Logs ONLY
-Focus on log analysis - do NOT output metrics, health status, or classifications.
-Your job is to identify:
-1. Error patterns in logs
-2. Which pods/nodes have errors
-3. Root causes based on error messages
-4. Whether errors are isolated or cluster-wide
+## Your Task
+Confirm the metric classifications above. Do NOT change them.
+Only output any anomalies or patterns you observe in the metrics themselves.
 
 ## Output Format
-Provide ONLY log analysis. No metrics, no health status, no classifications.
-
-### Error Analysis
-- List main error types found in logs
-- Which pods/nodes are affected
-- Error frequencies and patterns
-
-### Root Cause Summary
-- Connection between errors and resource usage
-- Whether issues are app-level or infrastructure-level
-- Any actionable insights from logs
-
-Do NOT output any health status, metric classifications, or structured metrics.`, classifiedMetrics)
+Keep output minimal and focused on metrics only.`, classifiedMetrics)
 }
 
 // GenerateNarrativePrompt creates a prompt for Phase 2: narrative generation based on structured analysis
