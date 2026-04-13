@@ -241,15 +241,34 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 			}
 		}
 
-		smokeTestsJSON, _ := json.Marshal(report.SmokeTests)
+		// Prepare smoke tests for LLM (remove severity to avoid confusion)
+		type smokeTestForLLM struct {
+			Name     string `json:"name"`
+			Type     string `json:"type"`
+			Status   string `json:"status"`
+			Message  string `json:"message"`
+			Duration int    `json:"duration_ms"`
+		}
+		var smokeTestsForLLM []smokeTestForLLM
+		for _, st := range report.SmokeTests {
+			smokeTestsForLLM = append(smokeTestsForLLM, smokeTestForLLM{
+				Name:     st.Name,
+				Type:     st.Type,
+				Status:   st.Status,
+				Message:  st.Message,
+				Duration: st.Duration,
+			})
+		}
+		smokeTestsJSON, _ := json.Marshal(smokeTestsForLLM)
 
-		// Phase 1: Data Analysis - Classify metrics with thresholds
+		// Phase 1: Data Analysis - Classify metrics with thresholds + INCLUDE LOG CONTEXT
 		dataAnalysisPrompt := r.llmClient.GenerateDataAnalysisPrompt(
 			metricsText,
 			fmt.Sprintf("%+v", result.Trends),
+			logContext, // NOW PASS LOG CONTEXT TO PHASE 1
 		)
 
-		log.Printf("LLM Phase 1 - Data Analysis prompt length: %d chars", len(dataAnalysisPrompt))
+		log.Printf("LLM Phase 1 - Data Analysis prompt length: %d chars (includes log context)", len(dataAnalysisPrompt))
 
 		dataAnalysisJSON, err := r.llmClient.Analyze(ctx, dataAnalysisPrompt)
 		if err != nil {
@@ -284,7 +303,7 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 func (r *Reporter) getLogContext(ctx context.Context, report *types.Report) string {
 	var context string
 
-	// Get failed pod errors first (most important)
+	// Get failed pod errors first (most important) - GET ALL ERRORS
 	podsFailed := 0
 	if pods, ok := report.ClusterMetrics["pods"].(map[string]interface{}); ok {
 		if failed, ok := pods["failed"].(float64); ok {
@@ -295,33 +314,61 @@ func (r *Reporter) getLogContext(ctx context.Context, report *types.Report) stri
 	if podsFailed > 0 {
 		failedPodErrors, err := r.lokiClient.GetFailedPodsErrors(ctx)
 		if err == nil && len(failedPodErrors) > 0 {
-			context += fmt.Sprintf("\n## Failed Pod Logs (%d pods)\n", podsFailed)
+			context += fmt.Sprintf("\n## Failed Pod Logs (%d pods with detailed errors)\n", podsFailed)
 			for pod, errors := range failedPodErrors {
 				if len(errors) > 0 {
 					context += fmt.Sprintf("\n### %s\n", pod)
-					for _, err := range errors {
-						context += fmt.Sprintf("- %s\n", err)
+					// Include ALL available errors, not just the first
+					context += "**Error Details:**\n"
+					for i, err := range errors {
+						// Include up to 10 error entries per pod for deep analysis
+						if i < 10 {
+							context += fmt.Sprintf("  %d. %s\n", i+1, err)
+						}
+					}
+					// Add error count context
+					if len(errors) > 10 {
+						context += fmt.Sprintf("  ... and %d more errors\n", len(errors)-10)
 					}
 				}
 			}
 		}
 	}
 
-	// Get recent errors from Loki
+	// Get recent errors from Loki - INCREASE SAMPLE SIZE
 	errors, err := r.lokiClient.GetRecentErrors(ctx, 1*time.Hour)
 	if err == nil && errors != nil {
 		if errors.TotalErrors > 0 {
-			context += fmt.Sprintf("\n## Recent Log Errors (1h)\n")
-			context += fmt.Sprintf("Total errors in last hour: %d\n", errors.TotalErrors)
+			context += fmt.Sprintf("\n## Recent Log Errors (1h window)\n")
+			context += fmt.Sprintf("**Total errors detected: %d**\n", errors.TotalErrors)
 			if len(errors.TopErrors) > 0 {
-				context += "Sample errors:\n"
-				for i, err := range errors.TopErrors {
-					if i < 3 {
-						context += fmt.Sprintf("- %s\n", err)
-					}
+				context += "\n**Top Error Patterns (for analysis):**\n"
+				// Increased from 3 to 10 samples for deeper analysis
+				maxSamples := 10
+				if len(errors.TopErrors) < maxSamples {
+					maxSamples = len(errors.TopErrors)
+				}
+				for i := 0; i < maxSamples; i++ {
+					context += fmt.Sprintf("  %d. %s\n", i+1, errors.TopErrors[i])
+				}
+				if len(errors.TopErrors) > 10 {
+					context += fmt.Sprintf("\n  ... %d additional error patterns detected\n", len(errors.TopErrors)-10)
 				}
 			}
 		}
+	}
+
+	// Get pod restart patterns if restarts > 5
+	podsRestarts := 0
+	if pods, ok := report.ClusterMetrics["pods"].(map[string]interface{}); ok {
+		if restarts, ok := pods["restarts"].(float64); ok {
+			podsRestarts = int(restarts)
+		}
+	}
+
+	if podsRestarts > 5 {
+		context += fmt.Sprintf("\n## Pod Restart Alert (%d restarts in 1h)\n", podsRestarts)
+		context += "This indicates potential pod crashes or resource issues. Check failed pod logs above for root causes.\n"
 	}
 
 	return context

@@ -1,0 +1,39 @@
+---
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: fresnel-frontend
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: http
+    category: fresnel
+    subcategory: fe
+spec:
+  type: http
+  enabled: true
+  severity: high
+  timeout: "10s"
+  interval: "2m"
+  url: "http://fresnel-frontend.fresnel.svc:80/health"
+  expectedStatus: 200
+
+---
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: fresnel-backend
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: http
+    category: fresnel
+    subcategory: be
+spec:
+  type: http
+  enabled: true
+  severity: high
+  timeout: "10s"
+  interval: "2m"
+  url: "http://fresnel-api.fresnel.svc:8080/healthz"
+  expectedStatus: 200

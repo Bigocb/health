@@ -61,9 +61,9 @@ analysis:
   llm:
     enabled: true
     provider: "ollama"
-    model: "phi3.5:3.8b"
+    model: "mistral:7b"
     endpoint: "http://ollama.ollama.svc.cluster.local:11434"
-    timeoutSeconds: 300
+    timeoutSeconds: 180
     maxRetries: 2
     temperature: 0.2
     maxTokens: 2048

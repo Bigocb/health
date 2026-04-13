@@ -208,8 +208,9 @@ Before responding, verify:
 }
 
 // GenerateDataAnalysisPrompt creates a prompt for Phase 1: structured data analysis with thresholds
-func (l *LLMClient) GenerateDataAnalysisPrompt(metrics string, trends string) string {
-	return fmt.Sprintf(`You are a Kubernetes cluster health analyst. Your task is to classify metrics and identify issues.
+// Now includes log context for deep correlation analysis
+func (l *LLMClient) GenerateDataAnalysisPrompt(metrics string, trends string, logContext string) string {
+	return fmt.Sprintf(`You are a Kubernetes cluster health analyst. Your task is to deeply analyze metrics AND logs to identify root causes.
 
 ## Thresholds for Health Classification
 - CPU Usage: Good <70%%, Elevated 70-85%%, Critical >85%%
@@ -224,136 +225,160 @@ func (l *LLMClient) GenerateDataAnalysisPrompt(metrics string, trends string) st
 ## Recent Trends
 %s
 
-## Your Analysis Task: Go Deep, Connect the Data
+## Log Context (for root cause analysis)
+%s
 
-IMPORTANT: Use ALL provided data to build comprehensive context:
-1. **Per-Node Analysis**: For each node in "Per-Node Metrics", extract:
+## Your Analysis Task: RESEARCH DEEPLY - Correlate Metrics WITH Logs
+
+CRITICAL: You MUST use ALL provided data including logs:
+
+1. **Deep Log Analysis**:
+   - Read ALL provided error logs and patterns carefully
+   - Identify recurring error messages and failure modes
+   - Note which pods/namespaces appear in errors
+   - Look for timing patterns (restarts, crashes, timeouts)
+   - Determine if errors are environmental (resource-related) or application-related
+
+2. **Per-Node Analysis**: For each node in "Per-Node Metrics", extract:
    - Node name, Ready status, Schedulable status
    - CPU usage %%, Memory usage %%, Available memory
    - Pod count on that node
    - Apply thresholds to each node's metrics individually
-   - Flag correlations (e.g., unschedulable node with high CPU/memory)
+   - **CHECK LOGS**: Are failed pods concentrated on specific nodes? This indicates NODE problems.
+   - **CHECK LOGS**: Do errors match node resource constraints? This indicates RESOURCE pressure.
 
-2. **Failed Pods Analysis**: Examine each failed pod:
+3. **Failed Pods Analysis**: Examine each failed pod:
    - Which namespace and node is it on?
-   - What's the failure reason?
-   - Pattern analysis: Are failed pods concentrated on specific nodes?
+   - What's the failure reason FROM LOGS?
+   - Is it a CrashLoop (app crash) or Resource issue (OOM/CPU limit)?
+   - Pattern analysis: Are failures concentrated on specific nodes or random?
+   - **CORRELATE**: Do log errors explain the failures?
 
-3. **Cluster Context**: Build a picture of overall health from:
-   - Aggregate metrics (cluster-wide CPU, Memory, Disk)
-   - Per-node distribution (are resources imbalanced?)
-   - Failed pod patterns (random? concentrated on one node?)
-   - Unschedulable nodes (why are they unschedulable?)
+4. **Root Cause Correlation**: This is CRITICAL:
+   - High CPU + Pod crashes = Resource pressure or CPU-intensive workload
+   - High Memory + Pod evictions = Memory leak or under-provisioning
+   - Failed pods on same node = Node health issue (kernel panic, disk full, etc)
+   - Specific error pattern in logs = Application or configuration problem
+   - Error spikes = Specific events (deployment, traffic surge, dependency failure)
 
-4. **Correlations**: Identify relationships:
-   - Unschedulable node + High CPU/Memory = Resource pressure
-   - Failed pods on same node = Node health issue
-   - Imbalanced resource distribution = Scheduling problem
-
-## Your Task: Classify Each Metric Using EXACT THRESHOLDS
-CRITICAL: Apply these EXACT thresholds. Do not deviate. Do not interpret trends.
+## Your Task: Classify Each Metric Using EXACT THRESHOLDS + Log Evidence
+CRITICAL: Apply these EXACT thresholds. Do not deviate.
 
 **Memory Usage Classification:**
 - If value < 75: status = good
 - If value >= 75 and < 90: status = elevated
 - If value >= 90: status = critical
-- Example: 27%% = good, 75%% = elevated, 90%% = critical
 
 **CPU Usage Classification:**
 - If value < 70: status = good
 - If value >= 70 and < 85: status = elevated
 - If value >= 85: status = critical
-- Example: 50%% = good, 70%% = elevated, 85%% = critical
 
 **Disk Usage Classification:**
 - If value < 80: status = good
 - If value >= 80 and < 95: status = elevated
 - If value >= 95: status = critical
-- Example: 45%% = good, 80%% = elevated, 95%% = critical
 
 ## CRITICAL: RESPONSE FORMAT
-DO NOT OUTPUT JSON.
-DO NOT OUTPUT CURLY BRACES.
-DO NOT OUTPUT SQUARE BRACKETS WITH KEY-VALUE PAIRS.
-
-Output ONLY plain markdown text using this EXACT format:
+DO NOT OUTPUT JSON. Output ONLY plain markdown text.
 
 ### Overall Health
-degraded
+[healthy/degraded/critical - determined by flags and log evidence]
 
 ### Metrics Summary
-- CPU Usage: 19.0%% → **good**
-- Memory Usage: 25.0%% → **good**
-- Disk Usage: 45.0%% → **good**
-- Available Memory: 121 GB
-- Available Storage: 637 GB
-- Nodes Total: 2 (Ready: 2, Unschedulable: 1)
-- Pods Total: 147 (Running: 147, Failed: 7, Pending: 0)
+- CPU Usage: XX.X%% → **status**
+- Memory Usage: XX.X%% → **status**
+- Disk Usage: XX.X%% → **status**
+- Available Memory: XXX GB
+- Available Storage: XXX GB
+- Nodes Total: X (Ready: X, Unschedulable: X)
+- Pods Total: X (Running: X, Failed: X, Pending: X)
 
 ### Per-Node Health
-Include ALL nodes with their detailed metrics and status:
-- nodename: CPU=XX.X%% → **status**, Memory=XX.X%% → **status**, Available=XXX.XGB, Pods=XX (Ready/Unschedulable/NotReady)
-- Example: app01: CPU=65.0%% → **elevated**, Memory=27.0%% → **good**, Available=3.0GB, Pods=7 (Unschedulable)
+[Include ALL nodes with detailed metrics and status]
+- nodename: CPU=XX.X%% → **status**, Memory=XX.X%% → **status**, Available=XXXGB, Pods=XX
+- Example: node-1: CPU=75.2%% → **elevated**, Memory=82.0%% → **elevated**, Available=8.5GB, Pods=28
+
+### Log Analysis & Root Causes
+[MUST INCLUDE THIS SECTION if logs are provided]
+Identify and explain:
+- Which errors are most frequent and what they indicate
+- Whether failures correlate with resource constraints
+- Which pods/nodes are problematic and why (based on logs)
+- If restarts are due to crashes (logs show panic) or resources (OOM messages)
 
 ### Flagged Issues
-- pods_failed: 7 → **critical** (Reason: failures concentrated on specific nodes or random distribution)
-- nodes_unschedulable: 1 → **elevated** (Node app01 - reason: high CPU/memory pressure or maintenance)
+- Issue: specific_count → **severity** (Root cause from logs and metrics)
+- Example: pods_failed: 5 → **elevated** (CrashLoopBackOff errors in logs, node-2 has 60%% available memory)
 
 Rules:
-- Only output markdown text
-- Start with ### Overall Health
-- Include ### Metrics Summary with each metric value
-- Only include ### Node Health if there are nodes
-- Only include ### Flagged Issues if there are elevated or critical items
-- Use this exact line format for metrics: "- Name: {number} → **{status}**"
-- NO JSON, NO BRACES, NO BRACKETS - ONLY MARKDOWN TEXT`, metrics, trends)
+- MUST use log context to explain issues
+- MUST correlate metrics with error patterns
+- MUST identify root causes, not just symptoms
+- Use this exact line format: "- Name: {number} → **{status}**"
+- NO JSON, NO BRACES, NO BRACKETS - ONLY MARKDOWN TEXT`, metrics, trends, logContext)
 }
 
 // GenerateNarrativePrompt creates a prompt for Phase 2: narrative generation based on structured analysis
 func (l *LLMClient) GenerateNarrativePrompt(dataAnalysisJSON string, smokeTests string, logContext string) string {
-	return fmt.Sprintf(`You are a Kubernetes cluster health analyst. Based on structured analysis, generate a narrative report.
+	return fmt.Sprintf(`You are a Kubernetes cluster health analyst. Based on deep analysis including logs, generate a comprehensive narrative report.
 
-## IMPORTANT INSTRUCTIONS
-- Reference ONLY the flagged_issues from the Phase 1 analysis
-- If no issues are flagged, cluster is healthy
+## CRITICAL INSTRUCTIONS
+- Use Phase 1 analysis as foundation
+- DEEPLY INCORPORATE provided logs and error context
+- Research log patterns to explain WHY issues occur
 - Do NOT invent metrics or thresholds
-- Do NOT modify severity levels from Phase 1
-- If Phase 1 says something is critical, you say it is critical
-- If Phase 1 says something is good, do NOT mention it as a problem
+- Reference actual error messages and patterns from logs
+- Connect metrics to log evidence for credibility
 
-## Structured Data Analysis (Phase 1 Results)
+## Phase 1 Structured Analysis (Includes Log Context)
 %s
 
-## Additional Context
-
-### Smoke Tests
+## Smoke Tests Status
 %s
 
-### Recent Logs
+## Log Context (For Root Cause Explanation)
 %s
 
-## Your Task: Generate Executive Report
-Using ONLY the issues flagged in the structured analysis, provide exactly 3 sections.
-INCORPORATE smoke test results and log samples when relevant to each section.
+## Your Task: Generate Executive Report with Deep Analysis
 
-### 1. Executive Summary (2-3 sentences)
-Summarize cluster health. If issues were flagged, mention them with specific values. Reference smoke test status (passed/failed). Otherwise, state the cluster is operating normally.
+You MUST reference logs and explain root causes based on error patterns.
 
-### 2. Critical Issues
-List ONLY flagged issues with:
-- Issue Name
-- Current Value (exact number)
-- Severity
-- Relevant log samples or error context from the logs provided above (if applicable)
+### 1. Executive Summary (2-3 sentences, with log evidence)
+Summarize cluster health. If issues flagged:
+- Mention specific values
+- Reference log evidence that supports the issue
+- Include smoke test impact
+Otherwise, state cluster is operating normally with passing smoke tests.
 
-If none flagged, write: "No critical issues identified. Smoke tests: [status]"
+### 2. Critical Issues (Deep Analysis Required)
+For EACH flagged issue:
+- Issue Name and Value
+- Severity (from Phase 1)
+- **Root Cause Analysis** (MUST use logs):
+  - What error messages appear in logs?
+  - Are these application crashes, resource constraints, or infrastructure issues?
+  - Do errors concentrate on specific pods/nodes?
+  - What is the timing pattern (continuous, intermittent, spikes)?
+- Impact: How does this affect cluster/services?
+
+If no issues flagged:
+"No critical issues identified. All smoke tests passing. Cluster operating normally."
 
 ### 3. Recommendations
-Provide 3 specific actions:
-- If issues flagged: Focus on resolving them using log context and smoke test failures as guidance
-- If no issues: Proactive maintenance suggestions considering smoke test results
+Provide 3-4 specific, actionable recommendations:
+- Based on log error patterns and root causes
+- Reference specific log entries or error types
+- If smoke tests failed, explain how to resolve
+- If pod crashes: check application logs for panic/error
+- If resource issues: provide capacity planning guidance
 
-Format each recommendation with: "[Action] because [reason from metrics/logs/tests]"`, dataAnalysisJSON, smokeTests, logContext)
+Format each recommendation:
+"[Action] because [specific reason from logs/metrics/tests]"
+Example: "Review application logs for OOMKilled pods because Memory Usage is 92% and logs show memory allocation failures"
+
+## Output Format
+Plain text, NOT JSON. Include all sections.`, dataAnalysisJSON, smokeTests, logContext)
 }
 
 func (l *LLMClient) IsAvailable(ctx context.Context) bool {
