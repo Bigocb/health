@@ -301,20 +301,22 @@ DO NOT OUTPUT JSON. Output ONLY plain markdown text.
 
 ### Log Analysis & Root Causes
 [MUST INCLUDE THIS SECTION if logs are provided]
-Identify and explain:
-- Which errors are most frequent and what they indicate
-- Whether failures correlate with resource constraints
-- Which pods/nodes are problematic and why (based on logs)
-- If restarts are due to crashes (logs show panic) or resources (OOM messages)
+Identify and explain WITH LOG SAMPLES:
+- Which errors are most frequent and what they indicate (cite specific error messages found)
+- Whether failures correlate with resource constraints (show OOM or CPU limit errors if present)
+- Which pods/nodes are problematic and why (reference actual log entries with timestamps)
+- If restarts are due to crashes (logs show panic) or resources (OOM messages) - include sample error lines
+- For each critical error identified, include 1-2 example log lines from the provided data
 
 ### Flagged Issues
-- Issue: specific_count → **severity** (Root cause from logs and metrics)
-- Example: pods_failed: 5 → **elevated** (CrashLoopBackOff errors in logs, node-2 has 60%% available memory)
+- Issue: specific_count → **severity** (Root cause from logs and metrics with evidence)
+- Example: pods_failed: 5 → **elevated** (5 pods show CrashLoopBackOff: "OOMKilled" in logs, node-2 has 60%% available memory)
+- Example: high_cpu: 82%% on node-1 → **elevated** (node-1 shows process consuming excessive CPU in container logs)
 
 Rules:
-- MUST use log context to explain issues
-- MUST correlate metrics with error patterns
-- MUST identify root causes, not just symptoms
+- MUST use log context to explain issues (cite actual error messages found)
+- MUST correlate metrics with error patterns (show how logs explain the metrics)
+- MUST identify root causes, not just symptoms (use log evidence to determine why)
 - Use this exact line format: "- Name: {number} → **{status}**"
 - NO JSON, NO BRACES, NO BRACKETS - ONLY MARKDOWN TEXT`, metrics, trends, logContext)
 }
