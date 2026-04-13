@@ -212,15 +212,19 @@ Before responding, verify:
 func (l *LLMClient) GenerateDataAnalysisPrompt(classifiedMetrics string, trends string, logContext string) string {
 	return fmt.Sprintf(`You are a Kubernetes cluster health analyst.
 
-## Deterministic Metric Classifications
+## Deterministic Metric Classifications (Server-Calculated)
 %s
 
 ## Your Task
-Confirm the metric classifications above. Do NOT change them.
-Only output any anomalies or patterns you observe in the metrics themselves.
+Confirm these metric classifications are correct. Do NOT change them.
+If all metrics are [good] or [elevated] with no [critical] status, simply output:
+"Metrics confirmed. All values within acceptable ranges."
+
+ONLY add observations if you identify actual issues or concerning patterns.
+Do NOT explain why healthy metrics are healthy - that is obvious.
 
 ## Output Format
-Keep output minimal and focused on metrics only.`, classifiedMetrics)
+Minimal. One line if metrics are fine. Only add detail if problems exist.`, classifiedMetrics)
 }
 
 // GenerateNarrativePrompt creates a prompt for Phase 2: narrative generation based on structured analysis
