@@ -50,7 +50,12 @@
       "Bash(chmod +x /tmp/monitor_current_build.sh)",
       "Bash(nohup /tmp/monitor_current_build.sh)",
       "Bash(git commit:*)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(kubectl patch configmap health-reporter-config -n monitoring --type merge -p '{:*)",
+      "Bash(git reset:*)",
+      "Bash(kubectl delete:*)",
+      "Bash(curl -H \"X-Scope-OrgID: admin\" http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/query_range -s -w \"\\\\n%{http_code}\\\\n\")",
+      "Bash(docker rmi:*)"
     ]
   }
 }
