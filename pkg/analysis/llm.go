@@ -311,9 +311,11 @@ Identify and explain WITH LOG SAMPLES:
 - For each critical error identified, include 1-2 example log lines from the provided data
 
 ### Flagged Issues
-- Issue: specific_count → **severity** (Root cause from logs and metrics with evidence)
-- Example: pods_failed: 5 → **elevated** (5 pods show CrashLoopBackOff: "OOMKilled" in logs, node-2 has 60%% available memory)
-- Example: high_cpu: 82%% on node-1 → **elevated** (node-1 shows process consuming excessive CPU in container logs)
+For each elevated/critical metric, output EXACT format using the ACTUAL node/metric names from provided data:
+- Issue: metric_name (or node_name_metric if per-node) → **severity** (evidence)
+- Example: cpu_usage: 82%% on vps01 → **elevated** (vps01 shows excessive CPU in logs)
+- Example: failed_pods: 5 → **elevated** (5 pods show CrashLoopBackOff in logs)
+CRITICAL: Use EXACT node names from Per-Node Metrics section (vps01, app01, internal, etc)
 
 Rules:
 - MUST use log context to explain issues (cite actual error messages found)
