@@ -16,6 +16,7 @@ import (
 	healthv1alpha1 "github.com/ArchipelagoAI/health-reporter/api/v1alpha1"
 	"github.com/ArchipelagoAI/health-reporter/controllers"
 	"github.com/ArchipelagoAI/health-reporter/pkg/analysis"
+	"github.com/ArchipelagoAI/health-reporter/pkg/cache"
 	"github.com/ArchipelagoAI/health-reporter/pkg/config"
 	"github.com/ArchipelagoAI/health-reporter/pkg/health"
 	"github.com/ArchipelagoAI/health-reporter/pkg/loki"
@@ -132,6 +133,29 @@ func main() {
 	// Setup root context with signal handling
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// Initialize enriched cache and background collector (after ctx is created)
+	if cfg.Cache.Enabled {
+		enrichedCache := cache.NewEnrichedCache(
+			cfg.Cache.MaxLogEntries,
+			time.Duration(cfg.Cache.MaxCacheAgeHours)*time.Hour,
+			int64(cfg.Cache.MaxMemoryMB)*1024*1024,
+		)
+		reporter.SetCache(enrichedCache)
+
+		// Create and start background collector
+		collector := cache.NewCacheCollector(
+			enrichedCache,
+			mimirClient,
+			lokiClient,
+			cfg.Cache.CollectionIntervalSeconds,
+		)
+		reporter.SetCacheCollector(collector)
+		collector.Start(ctx)
+		log.Printf("cache enabled: max %d log entries, %d hour retention, %d MB limit",
+			cfg.Cache.MaxLogEntries, cfg.Cache.MaxCacheAgeHours, cfg.Cache.MaxMemoryMB)
+		log.Printf("background collector started (interval: %ds)", cfg.Cache.CollectionIntervalSeconds)
+	}
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)

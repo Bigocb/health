@@ -13,6 +13,7 @@ type Config struct {
 	Discord  DiscordConfig  `yaml:"discord"`
 	Health   HealthConfig   `yaml:"health"`
 	Storage  StorageConfig  `yaml:"storage"`
+	Cache    CacheConfig    `yaml:"cache"`
 	Analysis AnalysisConfig `yaml:"analysis"`
 }
 
@@ -42,6 +43,14 @@ type HealthConfig struct {
 type StorageConfig struct {
 	ReportsDirectory string `yaml:"reports_directory"`
 	RetentionHours   int    `yaml:"retention_hours"`
+}
+
+type CacheConfig struct {
+	Enabled                   bool `yaml:"enabled"`
+	CollectionIntervalSeconds int  `yaml:"collection_interval_seconds"`
+	MaxLogEntries             int  `yaml:"max_log_entries"`
+	MaxCacheAgeHours          int  `yaml:"max_cache_age_hours"`
+	MaxMemoryMB               int  `yaml:"max_memory_mb"`
 }
 
 type AnalysisConfig struct {
@@ -117,6 +126,20 @@ func LoadConfig(path string) (*Config, error) {
 		cfg.Analysis.LLM.MaxRetries = 2
 	}
 
+	// Apply defaults for cache
+	if cfg.Cache.Enabled && cfg.Cache.CollectionIntervalSeconds == 0 {
+		cfg.Cache.CollectionIntervalSeconds = 60
+	}
+	if cfg.Cache.Enabled && cfg.Cache.MaxLogEntries == 0 {
+		cfg.Cache.MaxLogEntries = 1000
+	}
+	if cfg.Cache.Enabled && cfg.Cache.MaxCacheAgeHours == 0 {
+		cfg.Cache.MaxCacheAgeHours = 2
+	}
+	if cfg.Cache.Enabled && cfg.Cache.MaxMemoryMB == 0 {
+		cfg.Cache.MaxMemoryMB = 300
+	}
+
 	return &cfg, nil
 }
 
@@ -138,6 +161,13 @@ func DefaultConfig() *Config {
 		Storage: StorageConfig{
 			ReportsDirectory: "/var/lib/health-reporter/reports",
 			RetentionHours:   168,
+		},
+		Cache: CacheConfig{
+			Enabled:                   true,
+			CollectionIntervalSeconds: 60,
+			MaxLogEntries:             1000,
+			MaxCacheAgeHours:          2,
+			MaxMemoryMB:               300,
 		},
 		Analysis: AnalysisConfig{
 			Enabled:        false,

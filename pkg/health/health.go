@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ArchipelagoAI/health-reporter/pkg/analysis"
+	"github.com/ArchipelagoAI/health-reporter/pkg/cache"
 	"github.com/ArchipelagoAI/health-reporter/pkg/loki"
 	"github.com/ArchipelagoAI/health-reporter/pkg/mimir"
 	"github.com/ArchipelagoAI/health-reporter/pkg/smoke_tests"
@@ -32,6 +33,8 @@ type Reporter struct {
 	analyzer     *analysis.TrendDetector
 	llmClient    *analysis.LLMClient
 	analysisCfg  analysis.Config
+	cache        *cache.EnrichedCache        // NEW: enriched data cache
+	collector    *cache.CacheCollector       // NEW: background collector
 }
 
 type Config struct {
@@ -74,6 +77,14 @@ func (r *Reporter) SetLLMClient(client *analysis.LLMClient) {
 
 func (r *Reporter) SetAnalysisConfig(cfg analysis.Config) {
 	r.analysisCfg = cfg
+}
+
+func (r *Reporter) SetCache(c *cache.EnrichedCache) {
+	r.cache = c
+}
+
+func (r *Reporter) SetCacheCollector(collector *cache.CacheCollector) {
+	r.collector = collector
 }
 
 func (r *Reporter) Generate(ctx context.Context) (*types.Report, error) {
@@ -206,10 +217,17 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 
 	result := r.analyzer.Analyze(ctx, report, historicalReports)
 
-	// Get Loki logs for additional context
+	// Get Loki logs for additional context (from cache if available, else fetch live)
 	var logContext string
-	if r.lokiClient != nil && r.lokiClient.IsAvailable(ctx) {
+	if r.cache != nil {
+		// Use enriched cache data
+		logContext = r.getLogContextFromCache()
+		log.Printf("[Analyze] Using enriched cache data: %d failed pods, %d error entries",
+			r.cache.GetStats().FailedPodsCount, r.cache.GetStats().TotalErrorEntries)
+	} else if r.lokiClient != nil && r.lokiClient.IsAvailable(ctx) {
+		// Fallback: fetch live data (slower, less enriched)
 		logContext = r.getLogContext(ctx, report)
+		log.Printf("[Analyze] Fetching live log data (cache not available)")
 	}
 
 	if r.llmClient != nil && r.llmClient.IsAvailable(ctx) {
@@ -298,6 +316,60 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 	}
 
 	return result
+}
+
+// getLogContextFromCache builds log context from enriched cache data
+func (r *Reporter) getLogContextFromCache() string {
+	var context string
+
+	// Get enriched failed pods from cache
+	failedPods := r.cache.GetFailedPods()
+	if len(failedPods) > 0 {
+		context += fmt.Sprintf("\n## Failed Pod Logs (%d pods with detailed errors)\n", len(failedPods))
+		for _, pod := range failedPods {
+			context += fmt.Sprintf("\n### %s/%s\n", pod.Namespace, pod.PodName)
+			context += fmt.Sprintf("**Error Category:** %s\n", pod.ErrorCategory)
+			if len(pod.Errors) > 0 {
+				context += "**Error Details:**\n"
+				for i, err := range pod.Errors {
+					if i < 10 {
+						context += fmt.Sprintf("  %d. %s\n", i+1, err.Message)
+					}
+				}
+				if len(pod.Errors) > 10 {
+					context += fmt.Sprintf("  ... and %d more errors\n", len(pod.Errors)-10)
+				}
+			}
+			// Add node context if available
+			if pod.NodeMetricsAtTime.NodeName != "" {
+				context += fmt.Sprintf("**Node at failure time:** %s (CPU: %.1f%%, Memory: %.1f%%)\n",
+					pod.NodeMetricsAtTime.NodeName,
+					pod.NodeMetricsAtTime.CPUUsagePercent,
+					pod.NodeMetricsAtTime.MemoryUsagePercent)
+			}
+		}
+	}
+
+	// Get recent metrics trends
+	latestMetrics := r.cache.GetLatestMetrics()
+	if latestMetrics != nil {
+		context += fmt.Sprintf("\n## Recent Metrics Trends\n")
+		context += fmt.Sprintf("- CPU Trend: %s\n", latestMetrics.CPUTrend)
+		context += fmt.Sprintf("- Memory Trend: %s\n", latestMetrics.MemoryTrend)
+		context += fmt.Sprintf("- Last updated: %v\n", latestMetrics.Timestamp)
+	}
+
+	// Add cache stats
+	stats := r.cache.GetStats()
+	if stats.TotalErrorEntries > 0 {
+		context += fmt.Sprintf("\n## Cache Statistics\n")
+		context += fmt.Sprintf("- Failed pods tracked: %d\n", stats.FailedPodsCount)
+		context += fmt.Sprintf("- Total error entries: %d\n", stats.TotalErrorEntries)
+		context += fmt.Sprintf("- Error time window: %v to %v\n", stats.OldestErrorTime, stats.NewestErrorTime)
+		context += fmt.Sprintf("- Cache size: %.1f MB\n", float64(stats.CacheSizeBytes)/1024/1024)
+	}
+
+	return context
 }
 
 func (r *Reporter) getLogContext(ctx context.Context, report *types.Report) string {

@@ -558,3 +558,61 @@ func floatFromInterface(v interface{}) float64 {
 		return 0
 	}
 }
+
+// ToMap converts Metrics to map format for cache enrichment
+func (m *Metrics) ToMap() map[string]interface{} {
+	return map[string]interface{}{
+		"nodes": map[string]interface{}{
+			"total":         m.Nodes.Total,
+			"ready":         m.Nodes.Ready,
+			"not_ready":     m.Nodes.NotReady,
+			"unschedulable": m.Nodes.Unschedulable,
+			"cpu_cores":     m.Nodes.CPUCores,
+			"memory_gb":     m.Nodes.MemoryGB,
+		},
+		"pods": map[string]interface{}{
+			"total":         m.Pods.Total,
+			"running":       m.Pods.Running,
+			"pending":       m.Pods.Pending,
+			"failed":        m.Pods.Failed,
+			"succeeded":     m.Pods.Succeeded,
+			"restarts":      m.Pods.Restarts,
+			"unschedulable": m.Pods.Unschedulable,
+		},
+		"resources": map[string]interface{}{
+			"cpu_usage_percent":     m.Resources.CPUUsagePercent,
+			"memory_usage_percent":  m.Resources.MemoryUsagePercent,
+			"disk_usage_percent":    m.Resources.DiskUsagePercent,
+			"available_memory_gb":   m.Resources.AvailableMemoryGB,
+			"available_storage_gb":  m.Resources.AvailableStorageGB,
+			"cpu_cores_allocatable": m.Resources.CPUCoresAllocatable,
+			"memory_gb_allocatable": m.Resources.MemoryGBAllocatable,
+		},
+		"deployments": map[string]interface{}{
+			"total":       m.Deployments.Total,
+			"ready":       m.Deployments.Ready,
+			"unready":     m.Deployments.Unready,
+			"unavailable": m.Deployments.Unavailable,
+		},
+		"jobs": map[string]interface{}{
+			"total":     m.Jobs.Total,
+			"active":    m.Jobs.Active,
+			"failed":    m.Jobs.Failed,
+			"succeeded": m.Jobs.Succeeded,
+		},
+		"services": map[string]interface{}{
+			"total":        m.Services.Total,
+			"cluster_ip":   m.Services.ClusterIP,
+			"headless":     m.Services.Headless,
+			"loadbalancer": m.Services.TypeLoadBalancer,
+		},
+		"storage": map[string]interface{}{
+			"total_pvcs":        m.Storage.TotalPVCs,
+			"bound_pvcs":        m.Storage.BoundPVCs,
+			"pending_pvcs":      m.Storage.PendingPVCs,
+			"lost_pvcs":         m.Storage.LostPVCs,
+			"storage_used_gb":   m.Storage.StorageUsedGB,
+			"storage_capacity_gb": m.Storage.StorageCapacityGB,
+		},
+	}
+}

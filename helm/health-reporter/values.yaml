@@ -50,6 +50,14 @@ storage:
     size: 1Gi
     storageClass: ""  # Use default storage class
 
+# Cache configuration (enriched data for async analysis)
+cache:
+  enabled: true
+  collectionIntervalSeconds: 60
+  maxLogEntries: 1000           # Max error entries across all pods
+  maxCacheAgeHours: 2           # Keep data for 2 hours
+  maxMemoryMB: 300              # Hard limit on cache size
+
 # Analysis configuration
 analysis:
   enabled: true
@@ -69,12 +77,13 @@ analysis:
     maxTokens: 2048
 
 # Resource limits for the single deployment
+# Increased memory for cache: 64Mi -> 512Mi
 resources:
   requests:
-    memory: "64Mi"
-    cpu: "50m"
-  limits:
     memory: "256Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
     cpu: "500m"
 
 # Service Account
