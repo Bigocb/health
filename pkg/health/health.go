@@ -383,7 +383,8 @@ Your task: Analyze logs to explain WHY metrics are at these levels.`,
 			getIntValue(pods["pending"]))
 
 		log.Printf("LLM Phase 1 - Data Analysis prompt length: %d chars (includes log context)", len(dataAnalysisPrompt))
-		log.Printf("[DEBUG Phase1] Metrics text sent to LLM (first 500 chars):\n%s", truncateString(metricsText, 500))
+		log.Printf("[DEBUG Phase1] DETERMINISTIC Classifications (sent to LLM):\n%s", classifiedMetricsText)
+		log.Printf("[DEBUG Phase1] Full Prompt sent to LLM (first 800 chars):\n%s", truncateString(dataAnalysisPrompt, 800))
 
 		dataAnalysisRawResponse, err := r.llmClient.Analyze(ctx, dataAnalysisPrompt)
 		if err != nil {
