@@ -326,7 +326,8 @@ func (l *LLMClient) GenerateNarrativePrompt(dataAnalysisJSON string, smokeTests 
 	return fmt.Sprintf(`You are a Kubernetes cluster health analyst. Based on deep analysis including logs, generate a comprehensive narrative report.
 
 ## CRITICAL INSTRUCTIONS
-- Use Phase 1 analysis as foundation
+- **EXTRACT Phase 1's overall health status (healthy/degraded/critical) and USE IT directly**
+- Do NOT make your own health classification - use Phase 1's determination
 - DEEPLY INCORPORATE provided logs and error context
 - Research log patterns to explain WHY issues occur
 - Do NOT invent metrics or thresholds
@@ -344,28 +345,30 @@ func (l *LLMClient) GenerateNarrativePrompt(dataAnalysisJSON string, smokeTests 
 
 ## Your Task: Generate Executive Report with Deep Analysis
 
+**CRITICAL: Use Phase 1's overall health determination. Do NOT make your own health classification.**
+
 You MUST reference logs and explain root causes based on error patterns.
 
 ### 1. Executive Summary (2-3 sentences, with log evidence)
-Summarize cluster health. If issues flagged:
-- Mention specific values
-- Reference log evidence that supports the issue
-- Include smoke test impact
-Otherwise, state cluster is operating normally with passing smoke tests.
+Start with: "The cluster is currently in a **[HEALTH_STATUS]** state" where [HEALTH_STATUS] is the status from Phase 1 analysis.
+Then add:
+- If issues flagged: Mention specific values, reference log evidence, include smoke test impact
+- If healthy: "All smoke tests passing. Cluster operating normally."
+DO NOT override Phase 1's health determination.
 
 ### 2. Critical Issues (Deep Analysis Required)
-For EACH flagged issue:
-- Issue Name and Value
-- Severity (from Phase 1)
-- **Root Cause Analysis** (MUST use logs):
-  - What error messages appear in logs?
-  - Are these application crashes, resource constraints, or infrastructure issues?
-  - Do errors concentrate on specific pods/nodes?
-  - What is the timing pattern (continuous, intermittent, spikes)?
-- Impact: How does this affect cluster/services?
-
-If no issues flagged:
-"No critical issues identified. All smoke tests passing. Cluster operating normally."
+FIRST: Check Phase 1's "### Flagged Issues" section.
+- If Phase 1 flagged issues: For EACH flagged issue from Phase 1:
+  - Issue Name and Value (from Phase 1)
+  - Severity (from Phase 1)
+  - **Root Cause Analysis** (MUST use logs):
+    - What error messages appear in logs?
+    - Are these application crashes, resource constraints, or infrastructure issues?
+    - Do errors concentrate on specific pods/nodes?
+    - What is the timing pattern (continuous, intermittent, spikes)?
+  - Impact: How does this affect cluster/services?
+- If Phase 1 flagged NO issues:
+  "No critical issues identified. All smoke tests passing. Cluster operating normally."
 
 ### 3. Recommendations
 Provide 3-4 specific, actionable recommendations:
