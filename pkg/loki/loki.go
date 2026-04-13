@@ -69,6 +69,9 @@ func (c *Client) Query(ctx context.Context, query string, limit int) ([]string, 
 		req.SetBasicAuth(c.username, c.password)
 	}
 
+	// Add Loki org ID header
+	req.Header.Set("X-Scope-OrgID", "admin")
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -116,6 +119,9 @@ func (c *Client) QueryRange(ctx context.Context, query string, start, end time.T
 	if c.username != "" {
 		req.SetBasicAuth(c.username, c.password)
 	}
+
+	// Add Loki org ID header
+	req.Header.Set("X-Scope-OrgID", "admin")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -202,6 +208,9 @@ func (c *Client) IsAvailable(ctx context.Context) bool {
 	if err != nil {
 		return false
 	}
+
+	// Add Loki org ID header
+	req.Header.Set("X-Scope-OrgID", "admin")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
