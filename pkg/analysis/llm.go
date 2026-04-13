@@ -282,8 +282,10 @@ CRITICAL: Apply these EXACT thresholds. Do not deviate.
 ## CRITICAL: RESPONSE FORMAT
 DO NOT OUTPUT JSON. Output ONLY plain markdown text.
 
-### Overall Health
-[healthy/degraded/critical - determined by flags and log evidence]
+FIRST LINE AFTER ANALYSIS: Output this exact format:
+### Overall Health: [healthy/degraded/critical]
+
+Then continue with other sections below.
 
 ### Metrics Summary
 - CPU Usage: XX.X%% → **status**
@@ -326,7 +328,8 @@ func (l *LLMClient) GenerateNarrativePrompt(dataAnalysisJSON string, smokeTests 
 	return fmt.Sprintf(`You are a Kubernetes cluster health analyst. Based on deep analysis including logs, generate a comprehensive narrative report.
 
 ## CRITICAL INSTRUCTIONS
-- **EXTRACT Phase 1's overall health status (healthy/degraded/critical) and USE IT directly**
+- **FIRST: Extract Phase 1's health status from line: "### Overall Health: [healthy/degraded/critical]"**
+- **USE that status directly in your Executive Summary - do NOT change it**
 - Do NOT make your own health classification - use Phase 1's determination
 - DEEPLY INCORPORATE provided logs and error context
 - Research log patterns to explain WHY issues occur
