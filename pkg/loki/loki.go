@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -122,6 +123,7 @@ func (c *Client) QueryRange(ctx context.Context, query string, start, end time.T
 
 	// Add Loki org ID header
 	req.Header.Set("X-Scope-OrgID", "admin")
+	log.Printf("[Loki] QueryRange request headers: %v", req.Header)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -131,6 +133,7 @@ func (c *Client) QueryRange(ctx context.Context, query string, start, end time.T
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
+		log.Printf("[Loki] QueryRange failed with status %d: %s", resp.StatusCode, string(body))
 		return nil, fmt.Errorf("Loki query failed: %s", string(body))
 	}
 
