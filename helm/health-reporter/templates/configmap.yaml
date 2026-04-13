@@ -62,3 +62,6 @@ data:
         {{- if .Values.analysis.llm.maxTokens }}
         max_tokens: {{ .Values.analysis.llm.maxTokens }}
         {{- end }}
+        {{- if .Values.analysis.llm.phase2Model }}
+        phase2_model: {{ .Values.analysis.llm.phase2Model | quote }}
+        {{- end }}
