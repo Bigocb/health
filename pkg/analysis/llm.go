@@ -209,45 +209,34 @@ Before responding, verify:
 
 // GenerateDataAnalysisPrompt creates a prompt for Phase 1: structured data analysis with thresholds
 // Now includes log context for deep correlation analysis
-func (l *LLMClient) GenerateDataAnalysisPrompt(metrics string, trends string, logContext string) string {
-	return fmt.Sprintf(`You are a Kubernetes cluster health analyst. Analyze logs to EXPLAIN the cluster metrics below.
+func (l *LLMClient) GenerateDataAnalysisPrompt(classifiedMetrics string, trends string, logContext string) string {
+	return fmt.Sprintf(`You are a Kubernetes cluster health analyst. Analyze logs to provide ROOT CAUSE analysis.
 
-## Metric Classifications (Already Done - Server-Side)
-These metrics are already classified. DO NOT change them. Analyze logs to explain WHY they are at these levels.
-
+## Server-Side Metric Classifications (FIXED - Do NOT interpret or change)
 %s
 
-## Recent Trends
-%s
-
-## Log Context
-%s
-
-## Your Task: Explain Metrics Using Logs
-
-Focus ONLY on analyzing logs:
-1. For EACH elevated or critical metric: identify which logs explain it
-2. For EACH issue in the Flagged Issues section: cite specific log entries that support it
-3. Look for error patterns, pod crashes, and resource constraints
-4. Explain the correlation between metrics and log evidence
-
-Example:
-- If metrics show "CPU: elevated", explain: "Logs show OOMKilled errors on pod-X, causing CPU throttling"
-- If metrics show "Memory: good despite OOMKilled in logs", explain: "OOMKilled error is isolated to 1 pod; overall memory is healthy"
+## Your Task: Analyze Logs ONLY
+Focus on log analysis - do NOT output metrics, health status, or classifications.
+Your job is to identify:
+1. Error patterns in logs
+2. Which pods/nodes have errors
+3. Root causes based on error messages
+4. Whether errors are isolated or cluster-wide
 
 ## Output Format
-Plain markdown text only.
+Provide ONLY log analysis. No metrics, no health status, no classifications.
 
-### Log Analysis & Root Causes
-For each flagged/elevated issue, provide:
-- The specific metric/issue
-- Which log entries support this classification
-- Any error patterns or trends
-- No log evidence if none found
+### Error Analysis
+- List main error types found in logs
+- Which pods/nodes are affected
+- Error frequencies and patterns
 
-### Additional Insights
-- Any emerging problems visible in logs
-- Patterns that could lead to future issues`, metrics, trends, logContext)
+### Root Cause Summary
+- Connection between errors and resource usage
+- Whether issues are app-level or infrastructure-level
+- Any actionable insights from logs
+
+Do NOT output any health status, metric classifications, or structured metrics.`, classifiedMetrics)
 }
 
 // GenerateNarrativePrompt creates a prompt for Phase 2: narrative generation based on structured analysis

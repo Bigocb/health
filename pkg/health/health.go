@@ -347,12 +347,40 @@ Your task: Analyze logs to explain WHY metrics are at these levels.`,
 			classifiedMetrics["memory"].Value, classifiedMetrics["memory"].Status,
 			classifiedMetrics["disk"].Value, classifiedMetrics["disk"].Status)
 
-		// Phase 1: Log Analysis (LLM analyzes logs to explain classified metrics)
+		// Phase 1: Log Analysis ONLY (LLM analyzes logs, no metric classification)
 		dataAnalysisPrompt := r.llmClient.GenerateDataAnalysisPrompt(
 			classifiedMetricsText,
 			fmt.Sprintf("%+v", result.Trends),
 			logContext,
 		)
+
+		// Prepare Phase 1 result (we'll build this from server-side classifications)
+		// This avoids relying on LLM to output metrics correctly
+		phase1Result := fmt.Sprintf(`### Overall Health: %s
+
+### Metrics Summary
+- CPU Usage: %.1f%% [%s]
+- Memory Usage: %.1f%% [%s]
+- Disk Usage: %.1f%% [%s]
+- Available Memory: %.0f GB
+- Available Storage: %.0f GB
+- Nodes Total: %d (Ready: %d, Unschedulable: %d)
+- Pods Total: %d (Running: %d, Failed: %d, Pending: %d)
+
+`,
+			healthStatus,
+			classifiedMetrics["cpu"].Value, classifiedMetrics["cpu"].Status,
+			classifiedMetrics["memory"].Value, classifiedMetrics["memory"].Status,
+			classifiedMetrics["disk"].Value, classifiedMetrics["disk"].Status,
+			floatOrZero(resources["available_memory_gb"]),
+			floatOrZero(resources["available_storage_gb"]),
+			getIntValue(nodes["total"]),
+			getIntValue(nodes["ready"]),
+			getIntValue(nodes["unschedulable"]),
+			getIntValue(pods["total"]),
+			getIntValue(pods["running"]),
+			getIntValue(pods["failed"]),
+			getIntValue(pods["pending"]))
 
 		log.Printf("LLM Phase 1 - Data Analysis prompt length: %d chars (includes log context)", len(dataAnalysisPrompt))
 		log.Printf("[DEBUG Phase1] Metrics text sent to LLM (first 500 chars):\n%s", truncateString(metricsText, 500))
@@ -363,12 +391,12 @@ Your task: Analyze logs to explain WHY metrics are at these levels.`,
 			return result
 		}
 
-		log.Printf("[DEBUG Phase1] Raw LLM response (first 1000 chars):\n%s", truncateString(dataAnalysisRawResponse, 1000))
+		log.Printf("[DEBUG Phase1] Raw LLM response (log analysis only, first 1000 chars):\n%s", truncateString(dataAnalysisRawResponse, 1000))
 
-		// Validate and correct thresholds server-side to fix LLM misclassifications
-		dataAnalysisJSON := analysis.ValidatePhase1Response(dataAnalysisRawResponse)
+		// Combine server-side metrics + LLM log analysis
+		dataAnalysisJSON := phase1Result + "\n" + dataAnalysisRawResponse
 
-		log.Printf("[DEBUG Phase1] After ValidatePhase1Response (first 1000 chars):\n%s", truncateString(dataAnalysisJSON, 1000))
+		log.Printf("[DEBUG Phase1] Combined result (server metrics + LLM logs, first 1000 chars):\n%s", truncateString(dataAnalysisJSON, 1000))
 
 		// Phase 2: Narrative Generation - Create report based on analysis
 		narrativePrompt := r.llmClient.GenerateNarrativePrompt(
