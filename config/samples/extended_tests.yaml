@@ -46,6 +46,8 @@ metadata:
     app: health-reporter
     test-type: dns
     category: infra
+    subcategory: core
+    subcategory: core
 spec:
   type: dns
   enabled: true
@@ -64,6 +66,7 @@ metadata:
     app: health-reporter
     test-type: http
     category: infra
+    subcategory: observability
 spec:
   type: http
   enabled: true
@@ -83,6 +86,7 @@ metadata:
     app: health-reporter
     test-type: http
     category: infra
+    subcategory: observability
 spec:
   type: http
   enabled: true
@@ -103,6 +107,7 @@ metadata:
     app: health-reporter
     test-type: http
     category: infra
+    subcategory: core
 spec:
   type: http
   enabled: true
@@ -122,6 +127,7 @@ metadata:
     app: health-reporter
     test-type: http
     category: infra
+    subcategory: observability
 spec:
   type: http
   enabled: false
@@ -160,6 +166,8 @@ metadata:
     app: health-reporter
     test-type: dns
     category: infra
+    subcategory: core
+    subcategory: core
 spec:
   type: dns
   enabled: true
@@ -178,6 +186,7 @@ metadata:
     app: health-reporter
     test-type: http
     category: infra
+    subcategory: observability
 spec:
   type: http
   enabled: true
@@ -197,6 +206,7 @@ metadata:
     app: health-reporter
     test-type: http
     category: infra
+    subcategory: core
 spec:
   type: http
   enabled: true

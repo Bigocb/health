@@ -7,6 +7,7 @@ metadata:
     app: health-reporter
     test-type: dns
     category: infra
+    subcategory: core
 spec:
   type: dns
   enabled: true
