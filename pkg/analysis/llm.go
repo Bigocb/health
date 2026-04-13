@@ -292,9 +292,9 @@ Start your response with this exact line:
 Then immediately output the Metrics Summary section in EXACT format (copy this exactly, replacing XX values):
 
 ### Metrics Summary
-- CPU Usage: XX.X% → **status**
-- Memory Usage: XX.X% → **status**
-- Disk Usage: XX.X% → **status**
+- CPU Usage: XX.X% [status]
+- Memory Usage: XX.X% [status]
+- Disk Usage: XX.X% [status]
 - Available Memory: XXX GB
 - Available Storage: XXX GB
 - Nodes Total: X (Ready: X, Unschedulable: X)
@@ -302,11 +302,13 @@ Then immediately output the Metrics Summary section in EXACT format (copy this e
 
 ### Per-Node Health
 Copy this format EXACTLY for each node. Apply thresholds STRICTLY:
-- nodename: CPU=XX.X% → **status**, Memory=XX.X% → **status**, Available=XXXGB, Pods=XX
+- nodename: CPU=XX.X% [status], Memory=XX.X% [status], Available=XXXGB, Pods=XX
 EXAMPLES (follow these exactly):
-- node-1: CPU=75.2% → **elevated**, Memory=82.0% → **elevated**, Available=8.5GB, Pods=28
-- app01: CPU=26.0% → **good**, Memory=28.0% → **good**, Available=3.0GB, Pods=6
-- internal: CPU=19.0% → **good**, Memory=19.0% → **good**, Available=102.0GB, Pods=68
+- node-1: CPU=75.2% [elevated], Memory=82.0% [elevated], Available=8.5GB, Pods=28
+- app01: CPU=26.0% [good], Memory=28.0% [good], Available=3.0GB, Pods=6
+- internal: CPU=19.0% [good], Memory=19.0% [good], Available=102.0GB, Pods=68
+
+CRITICAL: Do not deviate from these examples. If you see 26% CPU, output [good]. If you see 75% CPU, output [elevated].
 
 ### Log Analysis & Root Causes
 [MUST INCLUDE THIS SECTION if logs are provided]
@@ -483,16 +485,16 @@ func correctMetricStatus(text, metricLabel, valueSuffix string, evaluateFunc fun
 	for i, line := range lines {
 		if strings.Contains(line, metricLabel) {
 			// Extract the numeric value from this line
-			// Pattern: "- Metric Name: {value}{suffix} → **{status}**"
+			// Pattern: "- Metric Name: {value}{suffix} [{status}]"
 			idx := strings.Index(line, metricLabel)
 			if idx == -1 {
 				continue
 			}
 			afterLabel := line[idx+len(metricLabel):]
 
-			// Find the number in the afterLabel (e.g., " 16.0% →")
+			// Find the number in the afterLabel (e.g., " 16.0% [")
 			// Look for digits (possibly with decimal point)
-			re := regexp.MustCompile(`\s*([\d.]+)` + regexp.QuoteMeta(valueSuffix) + `\s*→`)
+			re := regexp.MustCompile(`\s*([\d.]+)` + regexp.QuoteMeta(valueSuffix) + `\s*\[`)
 			matches := re.FindStringSubmatch(afterLabel)
 			if len(matches) < 2 {
 				log.Printf("[VALIDATOR] DEBUG: Could not extract value from line: %s", line)
@@ -510,13 +512,13 @@ func correctMetricStatus(text, metricLabel, valueSuffix string, evaluateFunc fun
 			correctStatus := evaluateFunc(value)
 
 			// Replace the old status with the correct one in this line
-			// Find pattern "→ **old_status**" and replace with "→ **correct_status**"
-			statusRe := regexp.MustCompile(`→\s*\*\*([a-z]+)\*\*`)
+			// Find pattern "[old_status]" and replace with "[correct_status]"
+			statusRe := regexp.MustCompile(`\[([a-z]+)\]`)
 			oldMatches := statusRe.FindStringSubmatchIndex(line)
 			if oldMatches != nil {
 				oldStatus := line[oldMatches[2]:oldMatches[3]]
 				if oldStatus != correctStatus {
-					line = statusRe.ReplaceAllString(line, fmt.Sprintf("→ **%s**", correctStatus))
+					line = statusRe.ReplaceAllString(line, fmt.Sprintf("[%s]", correctStatus))
 					lines[i] = line
 					log.Printf("[VALIDATOR] %s: %.1f%s - corrected from '%s' to '%s'", metricLabel, value, valueSuffix, oldStatus, correctStatus)
 					return strings.Join(lines, "\n"), true
