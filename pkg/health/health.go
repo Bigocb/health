@@ -330,17 +330,20 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 		)
 
 		log.Printf("LLM Phase 1 - Data Analysis prompt length: %d chars (includes log context)", len(dataAnalysisPrompt))
+		log.Printf("[DEBUG Phase1] Metrics text sent to LLM (first 500 chars):\n%s", truncateString(metricsText, 500))
 
-		dataAnalysisJSON, err := r.llmClient.Analyze(ctx, dataAnalysisPrompt)
+		dataAnalysisRawResponse, err := r.llmClient.Analyze(ctx, dataAnalysisPrompt)
 		if err != nil {
 			log.Printf("LLM Phase 1 failed: %v", err)
 			return result
 		}
 
-		// Validate and correct thresholds server-side to fix LLM misclassifications
-		dataAnalysisJSON = analysis.ValidatePhase1Response(dataAnalysisJSON)
+		log.Printf("[DEBUG Phase1] Raw LLM response (first 1000 chars):\n%s", truncateString(dataAnalysisRawResponse, 1000))
 
-		log.Printf("LLM Phase 1 analysis: %s", dataAnalysisJSON)
+		// Validate and correct thresholds server-side to fix LLM misclassifications
+		dataAnalysisJSON := analysis.ValidatePhase1Response(dataAnalysisRawResponse)
+
+		log.Printf("[DEBUG Phase1] After ValidatePhase1Response (first 1000 chars):\n%s", truncateString(dataAnalysisJSON, 1000))
 
 		// Phase 2: Narrative Generation - Create report based on analysis
 		narrativePrompt := r.llmClient.GenerateNarrativePrompt(
@@ -892,4 +895,12 @@ func intOrZero(v interface{}) int {
 	default:
 		return 0
 	}
+}
+
+// truncateString truncates a string to maxLen and adds "..." if truncated
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
