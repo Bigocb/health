@@ -324,10 +324,19 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 
 		// PHASE 1 STEP 1: Classify metrics server-side (deterministic, not LLM-based)
 		var cpuPercent, memPercent, diskPercent float64
+		var resourcesMap, nodesMap, podsMap map[string]interface{}
+
 		if resources, ok := report.ClusterMetrics["resources"].(map[string]interface{}); ok {
+			resourcesMap = resources
 			cpuPercent = floatOrZero(resources["cpu_usage_percent"])
 			memPercent = floatOrZero(resources["memory_usage_percent"])
 			diskPercent = floatOrZero(resources["disk_usage_percent"])
+		}
+		if nodes, ok := report.ClusterMetrics["nodes"].(map[string]interface{}); ok {
+			nodesMap = nodes
+		}
+		if pods, ok := report.ClusterMetrics["pods"].(map[string]interface{}); ok {
+			podsMap = pods
 		}
 
 		classifiedMetrics := analysis.ClassifyMetrics(cpuPercent, memPercent, diskPercent)
@@ -400,15 +409,15 @@ Your task: Analyze logs to explain WHY metrics are at these levels.`,
 			classifiedMetrics["cpu"].Value, classifiedMetrics["cpu"].Status,
 			classifiedMetrics["memory"].Value, classifiedMetrics["memory"].Status,
 			classifiedMetrics["disk"].Value, classifiedMetrics["disk"].Status,
-			floatOrZero(resources["available_memory_gb"]),
-			floatOrZero(resources["available_storage_gb"]),
-			getIntValue(nodes["total"]),
-			getIntValue(nodes["ready"]),
-			getIntValue(nodes["unschedulable"]),
-			getIntValue(pods["total"]),
-			getIntValue(pods["running"]),
-			getIntValue(pods["failed"]),
-			getIntValue(pods["pending"]))
+			floatOrZero(resourcesMap["available_memory_gb"]),
+			floatOrZero(resourcesMap["available_storage_gb"]),
+			getIntValue(nodesMap["total"]),
+			getIntValue(nodesMap["ready"]),
+			getIntValue(nodesMap["unschedulable"]),
+			getIntValue(podsMap["total"]),
+			getIntValue(podsMap["running"]),
+			getIntValue(podsMap["failed"]),
+			getIntValue(podsMap["pending"]))
 
 		log.Printf("LLM Phase 1 - Data Analysis prompt length: %d chars (includes log context)", len(dataAnalysisPrompt))
 		log.Printf("[DEBUG Phase1] DETERMINISTIC Classifications (sent to LLM):\n%s", classifiedMetricsText)
