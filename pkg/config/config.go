@@ -68,12 +68,13 @@ type TrendsConfig struct {
 }
 
 type LLMConfig struct {
-	Enabled        bool   `yaml:"enabled"`
-	Provider       string `yaml:"provider"` // "ollama", "openai", "anthropic"
-	Model          string `yaml:"model"`
-	Endpoint       string `yaml:"endpoint"`
-	TimeoutSeconds int    `yaml:"timeout_seconds"`
-	MaxRetries     int    `yaml:"max_retries"`
+	Enabled       bool   `yaml:"enabled"`
+	Provider      string `yaml:"provider"` // "ollama", "openai", "anthropic"
+	Model         string `yaml:"model"`
+	Phase2Model   string `yaml:"phase2_model"` // Optional: different model for Phase 2 narrative
+	Endpoint      string `yaml:"endpoint"`
+	TimeoutSeconds int   `yaml:"timeout_seconds"`
+	MaxRetries    int    `yaml:"max_retries"`
 }
 
 type OutputConfig struct {

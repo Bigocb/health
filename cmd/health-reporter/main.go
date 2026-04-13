@@ -121,6 +121,18 @@ func main() {
 			)
 			reporter.SetLLMClient(llmClient)
 			log.Printf("LLM analysis enabled: %s at %s", cfg.Analysis.LLM.Model, cfg.Analysis.LLM.Endpoint)
+
+			// Initialize separate Phase 2 LLM client if a different model is configured
+			if cfg.Analysis.LLM.Phase2Model != "" && cfg.Analysis.LLM.Phase2Model != cfg.Analysis.LLM.Model {
+				llmClient2 := analysis.NewLLMClient(
+					cfg.Analysis.LLM.Endpoint,
+					cfg.Analysis.LLM.Phase2Model,
+					cfg.Analysis.LLM.TimeoutSeconds,
+					cfg.Analysis.LLM.MaxRetries,
+				)
+				reporter.SetLLMClient2(llmClient2)
+				log.Printf("LLM Phase 2 (narrative): %s at %s", cfg.Analysis.LLM.Phase2Model, cfg.Analysis.LLM.Endpoint)
+			}
 		}
 		log.Printf("trend analysis enabled (window: %dh)", cfg.Analysis.Trends.WindowHours)
 	}

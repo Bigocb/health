@@ -69,12 +69,13 @@ analysis:
   llm:
     enabled: true
     provider: "ollama"
-    model: "phi"
+    model: "phi"  # Phase 1: Fast structured analysis (mistral:7b fallback to llama3.2:1b if unavailable)
     endpoint: "http://ollama.ollama.svc.cluster.local:11434"
     timeoutSeconds: 360  # 6 minutes for Ollama inference
     maxRetries: 1
     temperature: 0.2
     maxTokens: 2048
+    phase2Model: "mistral:7b"  # Phase 2: Better narrative generation (falls back to phi if unavailable)
 
 # Resource limits for the single deployment
 # Increased memory for cache: 64Mi -> 512Mi

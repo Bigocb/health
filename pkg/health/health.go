@@ -31,7 +31,8 @@ type Reporter struct {
 	testRegistry smoke_tests.TestRegistry
 	historyMgr   *storage.HistoryManager
 	analyzer     *analysis.TrendDetector
-	llmClient    *analysis.LLMClient
+	llmClient    *analysis.LLMClient  // Phase 1: Structured analysis
+	llmClient2   *analysis.LLMClient  // Phase 2: Narrative generation (different model)
 	analysisCfg  analysis.Config
 	cache        *cache.EnrichedCache  // NEW: enriched data cache
 	collector    *cache.CacheCollector // NEW: background collector
@@ -73,6 +74,10 @@ func (r *Reporter) SetAnalyzer(analyzer *analysis.TrendDetector) {
 
 func (r *Reporter) SetLLMClient(client *analysis.LLMClient) {
 	r.llmClient = client
+}
+
+func (r *Reporter) SetLLMClient2(client *analysis.LLMClient) {
+	r.llmClient2 = client
 }
 
 func (r *Reporter) SetAnalysisConfig(cfg analysis.Config) {
@@ -346,7 +351,13 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 
 		log.Printf("LLM Phase 2 - Narrative prompt length: %d chars", len(narrativePrompt))
 
-		if llmAnalysis, err := r.llmClient.Analyze(ctx, narrativePrompt); err == nil {
+		// Use Phase 2 LLM client if available, otherwise fall back to Phase 1 client
+		llm2 := r.llmClient2
+		if llm2 == nil {
+			llm2 = r.llmClient
+		}
+
+		if llmAnalysis, err := llm2.Analyze(ctx, narrativePrompt); err == nil {
 			result.HealthSummary = llmAnalysis
 		} else {
 			log.Printf("LLM Phase 2 failed: %v", err)

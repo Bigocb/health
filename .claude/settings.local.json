@@ -61,7 +61,9 @@
       "Bash(docker logout:*)",
       "Bash(docker login:*)",
       "Bash(gh workflow:*)",
-      "Bash(curl -s -H \"X-Scope-OrgID: admin\" 'http://mimir-nginx.monitoring.svc.cluster.local:80/prometheus/api/v1/query?query=sum\\(rate\\(http_requests_total{job=\"fresnel-backend\"}[5m]\\)\\)')"
+      "Bash(curl -s -H \"X-Scope-OrgID: admin\" 'http://mimir-nginx.monitoring.svc.cluster.local:80/prometheus/api/v1/query?query=sum\\(rate\\(http_requests_total{job=\"fresnel-backend\"}[5m]\\)\\)')",
+      "Bash(helm template:*)",
+      "Bash(find /c/Users/bigoc/dev/health -name \"*.go\" -type f -exec grep -l \"type.*LLM.*struct\" {} \\\\;)"
     ]
   }
 }
