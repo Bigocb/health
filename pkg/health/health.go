@@ -33,8 +33,8 @@ type Reporter struct {
 	analyzer     *analysis.TrendDetector
 	llmClient    *analysis.LLMClient
 	analysisCfg  analysis.Config
-	cache        *cache.EnrichedCache        // NEW: enriched data cache
-	collector    *cache.CacheCollector       // NEW: background collector
+	cache        *cache.EnrichedCache  // NEW: enriched data cache
+	collector    *cache.CacheCollector // NEW: background collector
 }
 
 type Config struct {
@@ -277,6 +277,23 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 			for _, pod := range report.FailedPods {
 				metricsText += fmt.Sprintf("- %s/%s: Phase=%s, Reason=%s, LastError=%s\n",
 					pod.Namespace, pod.Name, pod.Phase, pod.Reason, pod.LastError)
+			}
+		}
+
+		// Add application-level metrics to analysis
+		if appMetrics, ok := report.ClusterMetrics["applications"].(map[string]interface{}); ok && len(appMetrics) > 0 {
+			metricsText += "\n## Application Metrics\n"
+			for appName, metrics := range appMetrics {
+				if m, ok := metrics.(map[string]interface{}); ok {
+					metricsText += fmt.Sprintf("- %s:\n", appName)
+					metricsText += fmt.Sprintf("  Request Rate: %.2f req/s\n", floatOrZero(m["request_rate_rps"]))
+					metricsText += fmt.Sprintf("  Error Rate: %.2f err/s (%.1f%% of requests)\n",
+						floatOrZero(m["error_rate_rps"]), floatOrZero(m["error_percent"]))
+					metricsText += fmt.Sprintf("  Latency: P50=%.0fms, P95=%.0fms, P99=%.0fms\n",
+						floatOrZero(m["p50_latency_ms"]), floatOrZero(m["p95_latency_ms"]), floatOrZero(m["p99_latency_ms"]))
+					metricsText += fmt.Sprintf("  Replicas: %d available / %d desired\n\n",
+						intOrZero(m["available_replicas"]), intOrZero(m["desired_replicas"]))
+				}
 			}
 		}
 
@@ -552,11 +569,11 @@ func (r *Reporter) getFailedPodsList(ctx context.Context) []types.FailedPod {
 		}
 
 		failedPods = append(failedPods, types.FailedPod{
-			Namespace:   namespace,
-			Name:        name,
-			Phase:       "Failed",
-			Reason:      "Unknown",
-			LastError:   lastError,
+			Namespace:    namespace,
+			Name:         name,
+			Phase:        "Failed",
+			Reason:       "Unknown",
+			LastError:    lastError,
 			RestartCount: 0,
 		})
 	}
@@ -835,5 +852,33 @@ func getFloatValue(v interface{}) float64 {
 		return float64(val)
 	default:
 		return -1
+	}
+}
+
+// floatOrZero converts a value to float64, returning 0 if conversion fails
+func floatOrZero(v interface{}) float64 {
+	switch val := v.(type) {
+	case float64:
+		return val
+	case float32:
+		return float64(val)
+	case int:
+		return float64(val)
+	default:
+		return 0
+	}
+}
+
+// intOrZero converts a value to int, returning 0 if conversion fails
+func intOrZero(v interface{}) int {
+	switch val := v.(type) {
+	case int:
+		return val
+	case float64:
+		return int(val)
+	case float32:
+		return int(val)
+	default:
+		return 0
 	}
 }

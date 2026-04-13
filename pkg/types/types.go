@@ -16,13 +16,13 @@ const (
 
 // NodeMetrics represents per-node resource metrics
 type NodeMetrics struct {
-	Name              string  `json:"name"`
-	Ready             bool    `json:"ready"`
-	Unschedulable     bool    `json:"unschedulable"`
-	CPUUsagePercent   float64 `json:"cpu_usage_percent"`
+	Name               string  `json:"name"`
+	Ready              bool    `json:"ready"`
+	Unschedulable      bool    `json:"unschedulable"`
+	CPUUsagePercent    float64 `json:"cpu_usage_percent"`
 	MemoryUsagePercent float64 `json:"memory_usage_percent"`
-	AvailableMemoryGB float64 `json:"available_memory_gb"`
-	PodCount          int     `json:"pod_count"`
+	AvailableMemoryGB  float64 `json:"available_memory_gb"`
+	PodCount           int     `json:"pod_count"`
 }
 
 // FailedPod represents a failed pod with its details

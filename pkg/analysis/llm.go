@@ -408,7 +408,6 @@ func ValidatePhase1Response(markdownStr string) string {
 	return correctMarkdownStatuses(markdownStr, thresholds)
 }
 
-
 // correctMarkdownStatuses finds metric statuses in markdown and corrects them using thresholds
 func correctMarkdownStatuses(markdown string, thresholds HealthThresholds) string {
 	result := markdown

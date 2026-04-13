@@ -12,15 +12,15 @@ type EnrichedCache struct {
 	mu sync.RWMutex
 
 	// Storage
-	failedPods map[string]*EnrichedFailedPod // key: namespace/pod-name
-	metrics    []EnrichedMetrics              // time-series metrics
+	failedPods  map[string]*EnrichedFailedPod    // key: namespace/pod-name
+	metrics     []EnrichedMetrics                // time-series metrics
 	nodeMetrics map[string][]NodeMetricsSnapshot // key: node-name, time-series
 
 	// Configuration
-	maxLogEntries   int           // max error entries across all pods
-	maxCacheAge     time.Duration // evict data older than this
-	maxMemoryBytes  int64         // hard limit on cache size (soft enforcement)
-	collectionTime  time.Time     // last time data was collected
+	maxLogEntries  int           // max error entries across all pods
+	maxCacheAge    time.Duration // evict data older than this
+	maxMemoryBytes int64         // hard limit on cache size (soft enforcement)
+	collectionTime time.Time     // last time data was collected
 
 	// Stats
 	stats CacheStats
@@ -29,13 +29,13 @@ type EnrichedCache struct {
 // NewEnrichedCache creates a new cache with eviction policies
 func NewEnrichedCache(maxLogEntries int, maxCacheAge time.Duration, maxMemoryBytes int64) *EnrichedCache {
 	return &EnrichedCache{
-		failedPods:   make(map[string]*EnrichedFailedPod),
-		metrics:      make([]EnrichedMetrics, 0),
-		nodeMetrics:  make(map[string][]NodeMetricsSnapshot),
-		maxLogEntries: maxLogEntries,
-		maxCacheAge:  maxCacheAge,
+		failedPods:     make(map[string]*EnrichedFailedPod),
+		metrics:        make([]EnrichedMetrics, 0),
+		nodeMetrics:    make(map[string][]NodeMetricsSnapshot),
+		maxLogEntries:  maxLogEntries,
+		maxCacheAge:    maxCacheAge,
 		maxMemoryBytes: maxMemoryBytes,
-		stats:        CacheStats{},
+		stats:          CacheStats{},
 	}
 }
 

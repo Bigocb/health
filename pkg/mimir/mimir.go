@@ -18,15 +18,16 @@ type Client struct {
 
 // Metrics represents cluster metrics from Mimir
 type Metrics struct {
-	Timestamp   time.Time
-	Nodes       NodeMetrics
-	Pods        PodMetrics
-	Resources   ResourceMetrics
-	Deployments DeploymentMetrics
-	Jobs        JobMetrics
-	Services    ServiceMetrics
-	Storage     StorageMetrics
-	NodeDetails []NodeDetail  // NEW: per-node breakdown
+	Timestamp    time.Time
+	Nodes        NodeMetrics
+	Pods         PodMetrics
+	Resources    ResourceMetrics
+	Deployments  DeploymentMetrics
+	Jobs         JobMetrics
+	Services     ServiceMetrics
+	Storage      StorageMetrics
+	NodeDetails  []NodeDetail // NEW: per-node breakdown
+	Applications ApplicationMetrics
 }
 
 // NodeDetail represents per-node metrics
@@ -99,6 +100,22 @@ type StorageMetrics struct {
 	StorageCapacityGB float64
 }
 
+type ApplicationMetrics struct {
+	Applications map[string]AppDetail // app name -> metrics
+}
+
+type AppDetail struct {
+	Name              string
+	RequestRate       float64 // requests per second
+	ErrorRate         float64 // errors per second
+	ErrorPercent      float64 // percentage of requests that are errors (4xx/5xx)
+	P50LatencyMs      float64 // median latency in ms
+	P95LatencyMs      float64 // 95th percentile latency
+	P99LatencyMs      float64 // 99th percentile latency
+	AvailableReplicas int     // from deployment
+	DesiredReplicas   int     // from deployment
+}
+
 // NewClient creates a new Mimir client
 func NewClient(baseURL string) (*Client, error) {
 	if baseURL == "" {
@@ -163,6 +180,11 @@ func (c *Client) GetMetrics(ctx context.Context) (*Metrics, error) {
 	// Query storage metrics
 	if err := c.queryStorageMetrics(ctx, metrics); err != nil {
 		fmt.Printf("[WARN] failed to query storage metrics: %v\n", err)
+	}
+
+	// Query application metrics
+	if err := c.queryApplicationMetrics(ctx, metrics); err != nil {
+		fmt.Printf("[WARN] failed to query application metrics: %v\n", err)
 	}
 
 	return metrics, nil
@@ -427,11 +449,11 @@ func (c *Client) queryStorageMetrics(ctx context.Context, m *Metrics) error {
 // queryResourceMetrics queries resource usage from Mimir
 func (c *Client) queryResourceMetrics(ctx context.Context, m *Metrics) error {
 	queries := map[string]string{
-		"cpu_usage":       `round(100*(1-avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))),1)`,
-		"mem_usage":       `round(100*(1-sum(node_memory_MemAvailable_bytes)/sum(node_memory_MemTotal_bytes)),1)`,
-		"disk_usage":      `round(100*(1-sum(node_filesystem_avail_bytes{mountpoint="/"})/sum(node_filesystem_size_bytes{mountpoint="/"})),1)`,
-		"mem_available":   `round(sum(node_memory_MemAvailable_bytes)/1024/1024/1024,1)`,
-		"disk_available":  `round(sum(node_filesystem_avail_bytes{mountpoint="/"})/1024/1024/1024,1)`,
+		"cpu_usage":      `round(100*(1-avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))),1)`,
+		"mem_usage":      `round(100*(1-sum(node_memory_MemAvailable_bytes)/sum(node_memory_MemTotal_bytes)),1)`,
+		"disk_usage":     `round(100*(1-sum(node_filesystem_avail_bytes{mountpoint="/"})/sum(node_filesystem_size_bytes{mountpoint="/"})),1)`,
+		"mem_available":  `round(sum(node_memory_MemAvailable_bytes)/1024/1024/1024,1)`,
+		"disk_available": `round(sum(node_filesystem_avail_bytes{mountpoint="/"})/1024/1024/1024,1)`,
 	}
 
 	results, err := c.queryRange(ctx, queries)
@@ -450,6 +472,98 @@ func (c *Client) queryResourceMetrics(ctx context.Context, m *Metrics) error {
 	m.Resources.DiskUsagePercent = floatValue(results["disk_usage"])
 	m.Resources.AvailableMemoryGB = floatValue(results["mem_available"])
 	m.Resources.AvailableStorageGB = floatValue(results["disk_available"])
+
+	return nil
+}
+
+// queryApplicationMetrics queries application-level metrics like HTTP request rates and latency
+func (c *Client) queryApplicationMetrics(ctx context.Context, m *Metrics) error {
+	m.Applications.Applications = make(map[string]AppDetail)
+
+	// List of applications to monitor
+	apps := []string{
+		"fresnel-backend",
+		"argocd-server",
+		"argocd-repo-server",
+		"registry",
+	}
+
+	for _, app := range apps {
+		detail := AppDetail{Name: app}
+
+		// Query request rate (requests per second over last 5 minutes)
+		reqRateQuery := fmt.Sprintf(
+			`sum(rate(http_requests_total{job="%s"}[5m]))`,
+			app,
+		)
+		if val, err := c.query(ctx, reqRateQuery); err == nil {
+			detail.RequestRate = val
+		}
+
+		// Query error rate (5xx and 4xx errors per second)
+		errRateQuery := fmt.Sprintf(
+			`sum(rate(http_requests_total{job="%s",status=~"[45].."}[5m]))`,
+			app,
+		)
+		if val, err := c.query(ctx, errRateQuery); err == nil {
+			detail.ErrorRate = val
+		}
+
+		// Query error percentage
+		errPctQuery := fmt.Sprintf(
+			`round(100*sum(rate(http_requests_total{job="%s",status=~"[45].."}[5m]))/sum(rate(http_requests_total{job="%s"}[5m])),1)`,
+			app, app,
+		)
+		if val, err := c.query(ctx, errPctQuery); err == nil {
+			detail.ErrorPercent = val
+		}
+
+		// Query p50 latency (milliseconds)
+		p50Query := fmt.Sprintf(
+			`histogram_quantile(0.5, sum(rate(http_request_duration_seconds_bucket{job="%s"}[5m])) by (le)) * 1000`,
+			app,
+		)
+		if val, err := c.query(ctx, p50Query); err == nil {
+			detail.P50LatencyMs = val
+		}
+
+		// Query p95 latency
+		p95Query := fmt.Sprintf(
+			`histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job="%s"}[5m])) by (le)) * 1000`,
+			app,
+		)
+		if val, err := c.query(ctx, p95Query); err == nil {
+			detail.P95LatencyMs = val
+		}
+
+		// Query p99 latency
+		p99Query := fmt.Sprintf(
+			`histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job="%s"}[5m])) by (le)) * 1000`,
+			app,
+		)
+		if val, err := c.query(ctx, p99Query); err == nil {
+			detail.P99LatencyMs = val
+		}
+
+		// Query deployment replicas
+		replicasQuery := fmt.Sprintf(
+			`sum(kube_deployment_status_replicas_available{deployment="%s"})`,
+			app,
+		)
+		if val, err := c.query(ctx, replicasQuery); err == nil {
+			detail.AvailableReplicas = int(val)
+		}
+
+		desiredQuery := fmt.Sprintf(
+			`sum(kube_deployment_spec_replicas{deployment="%s"})`,
+			app,
+		)
+		if val, err := c.query(ctx, desiredQuery); err == nil {
+			detail.DesiredReplicas = int(val)
+		}
+
+		m.Applications.Applications[app] = detail
+	}
 
 	return nil
 }
@@ -607,12 +721,31 @@ func (m *Metrics) ToMap() map[string]interface{} {
 			"loadbalancer": m.Services.TypeLoadBalancer,
 		},
 		"storage": map[string]interface{}{
-			"total_pvcs":        m.Storage.TotalPVCs,
-			"bound_pvcs":        m.Storage.BoundPVCs,
-			"pending_pvcs":      m.Storage.PendingPVCs,
-			"lost_pvcs":         m.Storage.LostPVCs,
-			"storage_used_gb":   m.Storage.StorageUsedGB,
+			"total_pvcs":          m.Storage.TotalPVCs,
+			"bound_pvcs":          m.Storage.BoundPVCs,
+			"pending_pvcs":        m.Storage.PendingPVCs,
+			"lost_pvcs":           m.Storage.LostPVCs,
+			"storage_used_gb":     m.Storage.StorageUsedGB,
 			"storage_capacity_gb": m.Storage.StorageCapacityGB,
 		},
+		"applications": m.applicationsToMap(),
 	}
+}
+
+// applicationsToMap converts application metrics to map format
+func (m *Metrics) applicationsToMap() map[string]interface{} {
+	appMaps := make(map[string]interface{})
+	for name, detail := range m.Applications.Applications {
+		appMaps[name] = map[string]interface{}{
+			"request_rate_rps":   detail.RequestRate,
+			"error_rate_rps":     detail.ErrorRate,
+			"error_percent":      detail.ErrorPercent,
+			"p50_latency_ms":     detail.P50LatencyMs,
+			"p95_latency_ms":     detail.P95LatencyMs,
+			"p99_latency_ms":     detail.P99LatencyMs,
+			"available_replicas": detail.AvailableReplicas,
+			"desired_replicas":   detail.DesiredReplicas,
+		}
+	}
+	return appMaps
 }

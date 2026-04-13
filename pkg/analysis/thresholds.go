@@ -2,16 +2,16 @@ package analysis
 
 // ResourceThreshold defines what constitutes good, elevated, and critical resource usage
 type ResourceThreshold struct {
-	Good      int // Percentage: usage below this is healthy
-	Elevated  int // Percentage: usage between Good and Elevated is concerning
-	Critical  int // Percentage: usage above this is critical
+	Good     int // Percentage: usage below this is healthy
+	Elevated int // Percentage: usage between Good and Elevated is concerning
+	Critical int // Percentage: usage above this is critical
 }
 
 // HealthThresholds contains all thresholds for evaluating cluster health
 type HealthThresholds struct {
-	CPU     ResourceThreshold // CPU usage: good <70%, elevated 70-85%, critical >85%
-	Memory  ResourceThreshold // Memory usage: good <75%, elevated 75-90%, critical >90%
-	Disk    ResourceThreshold // Disk usage: good <80%, elevated 80-95%, critical >95%
+	CPU    ResourceThreshold // CPU usage: good <70%, elevated 70-85%, critical >85%
+	Memory ResourceThreshold // Memory usage: good <75%, elevated 75-90%, critical >90%
+	Disk   ResourceThreshold // Disk usage: good <80%, elevated 80-95%, critical >95%
 }
 
 // DefaultThresholds returns sensible defaults for Kubernetes cluster health evaluation

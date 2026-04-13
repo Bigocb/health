@@ -4,16 +4,16 @@ import "time"
 
 // EnrichedFailedPod represents a failed pod with contextual node information
 type EnrichedFailedPod struct {
-	PodName            string                 `json:"pod_name"`
-	Namespace          string                 `json:"namespace"`
-	NodeName           string                 `json:"node_name"`
-	Phase              string                 `json:"phase"`
-	Reason             string                 `json:"reason"`
-	LastError          string                 `json:"last_error"`
-	Timestamp          time.Time              `json:"timestamp"`
-	Errors             []ErrorEntry           `json:"errors"` // All errors for this pod
-	NodeMetricsAtTime  NodeMetricsSnapshot    `json:"node_metrics_at_time"`
-	ErrorCategory      string                 `json:"error_category"` // crash, timeout, resource, config, unknown
+	PodName           string              `json:"pod_name"`
+	Namespace         string              `json:"namespace"`
+	NodeName          string              `json:"node_name"`
+	Phase             string              `json:"phase"`
+	Reason            string              `json:"reason"`
+	LastError         string              `json:"last_error"`
+	Timestamp         time.Time           `json:"timestamp"`
+	Errors            []ErrorEntry        `json:"errors"` // All errors for this pod
+	NodeMetricsAtTime NodeMetricsSnapshot `json:"node_metrics_at_time"`
+	ErrorCategory     string              `json:"error_category"` // crash, timeout, resource, config, unknown
 }
 
 // ErrorEntry represents a single error log from a pod
@@ -37,32 +37,32 @@ type NodeMetricsSnapshot struct {
 
 // EnrichedMetrics represents metrics with trend information
 type EnrichedMetrics struct {
-	Timestamp           time.Time     `json:"timestamp"`
-	ClusterMetrics      map[string]interface{} `json:"cluster_metrics"`
-	NodeMetrics         []NodeMetricsSnapshot  `json:"node_metrics"`
-	CPUTrend            TrendDirection `json:"cpu_trend"`    // up, down, stable
-	MemoryTrend         TrendDirection `json:"memory_trend"` // up, down, stable
-	PreviousTimestamp   time.Time      `json:"previous_timestamp"`
-	PreviousCPU         float64        `json:"previous_cpu"`
-	PreviousMemory      float64        `json:"previous_memory"`
+	Timestamp         time.Time              `json:"timestamp"`
+	ClusterMetrics    map[string]interface{} `json:"cluster_metrics"`
+	NodeMetrics       []NodeMetricsSnapshot  `json:"node_metrics"`
+	CPUTrend          TrendDirection         `json:"cpu_trend"`    // up, down, stable
+	MemoryTrend       TrendDirection         `json:"memory_trend"` // up, down, stable
+	PreviousTimestamp time.Time              `json:"previous_timestamp"`
+	PreviousCPU       float64                `json:"previous_cpu"`
+	PreviousMemory    float64                `json:"previous_memory"`
 }
 
 // TrendDirection indicates metric direction
 type TrendDirection string
 
 const (
-	TrendUp    TrendDirection = "up"
-	TrendDown  TrendDirection = "down"
+	TrendUp     TrendDirection = "up"
+	TrendDown   TrendDirection = "down"
 	TrendStable TrendDirection = "stable"
 )
 
 // CacheStats for monitoring cache health
 type CacheStats struct {
-	FailedPodsCount      int           `json:"failed_pods_count"`
-	TotalErrorEntries    int           `json:"total_error_entries"`
-	OldestErrorTime      time.Time     `json:"oldest_error_time"`
-	NewestErrorTime      time.Time     `json:"newest_error_time"`
-	CacheSizeBytes       int64         `json:"cache_size_bytes"`
-	LastCollectionTime   time.Time     `json:"last_collection_time"`
-	CollectionErrors     int           `json:"collection_errors"`
+	FailedPodsCount    int       `json:"failed_pods_count"`
+	TotalErrorEntries  int       `json:"total_error_entries"`
+	OldestErrorTime    time.Time `json:"oldest_error_time"`
+	NewestErrorTime    time.Time `json:"newest_error_time"`
+	CacheSizeBytes     int64     `json:"cache_size_bytes"`
+	LastCollectionTime time.Time `json:"last_collection_time"`
+	CollectionErrors   int       `json:"collection_errors"`
 }

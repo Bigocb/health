@@ -55,7 +55,12 @@
       "Bash(git reset:*)",
       "Bash(kubectl delete:*)",
       "Bash(curl -H \"X-Scope-OrgID: admin\" http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/query_range -s -w \"\\\\n%{http_code}\\\\n\")",
-      "Bash(docker rmi:*)"
+      "Bash(docker rmi:*)",
+      "Bash(kubectl patch configmap health-reporter-config -n monitoring --type=json '-p=[:*)",
+      "Bash(docker image:*)",
+      "Bash(docker logout:*)",
+      "Bash(docker login:*)",
+      "Bash(gh workflow:*)"
     ]
   }
 }
