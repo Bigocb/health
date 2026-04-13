@@ -261,9 +261,18 @@ List the key metrics from Phase 1:
 - Smoke test results
 
 ### 3. Recommendations (if any issues)
-If Phase 1 shows [elevated] or [critical] metrics:
-- Provide 2-3 specific, actionable recommendations
-- Base them on the metric values shown
+**ONLY address [elevated] or [critical] metrics from Phase 1. Ignore [good] metrics.**
+
+For EACH [elevated] or [critical] metric:
+- State the exact node name and metric value from Phase 1
+- Provide one specific action
+- Do NOT recommend actions on [good] metrics
+
+Example (if app01 had CPU 85% [critical]):
+"Address critical CPU usage on app01 (85%) by investigating resource-intensive pods or scaling the deployment."
+
+If all metrics are [good]:
+"No issues identified. Continue monitoring."
 
 ## Output Format
 Plain text. Keep it concise and fact-based.`, dataAnalysisJSON, smokeTests)
