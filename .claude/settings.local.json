@@ -60,7 +60,8 @@
       "Bash(docker image:*)",
       "Bash(docker logout:*)",
       "Bash(docker login:*)",
-      "Bash(gh workflow:*)"
+      "Bash(gh workflow:*)",
+      "Bash(curl -s -H \"X-Scope-OrgID: admin\" 'http://mimir-nginx.monitoring.svc.cluster.local:80/prometheus/api/v1/query?query=sum\\(rate\\(http_requests_total{job=\"fresnel-backend\"}[5m]\\)\\)')"
     ]
   }
 }

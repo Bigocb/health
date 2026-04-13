@@ -61,7 +61,7 @@ cache:
 # Analysis configuration
 analysis:
   enabled: true
-  timeoutSeconds: 30
+  timeoutSeconds: 360  # 6 minutes to allow for slow LLM inference
   trends:
     windowHours: 24
     anomalyThreshold: 1.5

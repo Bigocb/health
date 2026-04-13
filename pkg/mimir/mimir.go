@@ -182,10 +182,10 @@ func (c *Client) GetMetrics(ctx context.Context) (*Metrics, error) {
 		fmt.Printf("[WARN] failed to query storage metrics: %v\n", err)
 	}
 
-	// Query application metrics
-	if err := c.queryApplicationMetrics(ctx, metrics); err != nil {
-		fmt.Printf("[WARN] failed to query application metrics: %v\n", err)
-	}
+	// Query application metrics (disabled - metrics not found in current setup)
+	// if err := c.queryApplicationMetrics(ctx, metrics); err != nil {
+	// 	fmt.Printf("[WARN] failed to query application metrics: %v\n", err)
+	// }
 
 	return metrics, nil
 }
