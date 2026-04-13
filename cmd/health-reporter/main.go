@@ -135,6 +135,10 @@ func main() {
 	defer cancel()
 
 	// Initialize enriched cache and background collector (after ctx is created)
+	log.Printf("cache configuration: enabled=%v, interval=%ds, maxEntries=%d, maxAge=%dh, maxMem=%dMB",
+		cfg.Cache.Enabled, cfg.Cache.CollectionIntervalSeconds, cfg.Cache.MaxLogEntries,
+		cfg.Cache.MaxCacheAgeHours, cfg.Cache.MaxMemoryMB)
+
 	if cfg.Cache.Enabled {
 		enrichedCache := cache.NewEnrichedCache(
 			cfg.Cache.MaxLogEntries,
