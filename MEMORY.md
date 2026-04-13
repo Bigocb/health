@@ -65,18 +65,39 @@
 - **Config Source**: ConfigMap (health-reporter-config)
 - **Last Updated**: 2026-04-12 18:27:12 (Revision 52)
 
-## Next Steps
+## Session 2: Phase 1 Enhancement & Smoke Test Organization (2026-04-12 Evening)
 
-1. **Monitor GitHub Build**: Check Actions tab for build completion (should be 5-10 min)
-   - Building: da864eb (node metrics label fix) + 505c178 (headless query fix)
-2. **Restart Pod**: Once image is pushed (pullPolicy: Always will auto-pull)
-   ```bash
-   kubectl rollout restart deployment/health-reporter -n monitoring
-   ```
-3. **Verify Fixes**: Check logs for:
-   - Node metrics showing non-zero values (should appear in next hourly run)
-   - No more `[WARN] query failed for headless` error
-   - Next hourly report should have correct node metrics
+### Phase 1 Data Analysis Enhanced ✅
+- **Commit**: ef980a5 - Deep data analysis with per-node metrics
+- **Changes**: 
+  - Updated Phase 1 prompt to analyze per-node metrics deeply
+  - Added per-node health to output format (CPU%, Memory%, Available GB)
+  - Included correlation analysis (resource pressure, failure patterns)
+  - Phase 1 now provides richer context for Phase 2 narrative
+
+### Smoke Tests Added & Organized ✅
+**New Tests Added**:
+- **service-discovery**: DNS resolution for service discovery (infra/core)
+- **loki-health**: HTTP health check for Loki (infra/observability)
+- **kargo-health**: Kargo deployment system health (infra/core)
+
+**Test Categories Established**:
+```
+infra/
+  ├─ observability: Loki, Mimir, Grafana, Minio
+  └─ core: DNS, service-discovery, Kargo, Higress, ArgoCD
+fresnel/ (to be added)
+  ├─ fe (frontend)
+  └─ be (backend)
+garnet/ (to be added)
+nats/ (to be added)
+canary/ (to be added)
+production/ (to be added)
+```
+
+**Commits**:
+- a46a241: Initial tests + category labels
+- feac725: Subcategories for infra (observability/core)
 
 ## Deployment Commands
 ```bash
