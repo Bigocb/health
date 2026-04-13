@@ -6,6 +6,7 @@ metadata:
   labels:
     app: health-reporter
     test-type: dns
+    category: infra
 spec:
   type: dns
   enabled: true

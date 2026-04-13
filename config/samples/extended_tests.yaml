@@ -45,6 +45,7 @@ metadata:
   labels:
     app: health-reporter
     test-type: dns
+    category: infra
 spec:
   type: dns
   enabled: true
@@ -62,6 +63,7 @@ metadata:
   labels:
     app: health-reporter
     test-type: http
+    category: infra
 spec:
   type: http
   enabled: true
@@ -80,6 +82,7 @@ metadata:
   labels:
     app: health-reporter
     test-type: http
+    category: infra
 spec:
   type: http
   enabled: true
@@ -99,6 +102,7 @@ metadata:
   labels:
     app: health-reporter
     test-type: http
+    category: infra
 spec:
   type: http
   enabled: true
@@ -117,6 +121,7 @@ metadata:
   labels:
     app: health-reporter
     test-type: http
+    category: infra
 spec:
   type: http
   enabled: false
@@ -143,3 +148,60 @@ spec:
 #   url: "http://ingress-nginx-controller.ingress-nginx.svc:10246/healthz"
 #   expectedStatus: 200
 # Using Higress instead - see config/samples/higress_test.yaml
+
+---
+# Infrastructure Health Tests
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: service-discovery
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: dns
+    category: infra
+spec:
+  type: dns
+  enabled: true
+  severity: critical
+  timeout: "5s"
+  interval: "2m"
+  domain: "kubernetes.default.svc.cluster.local"
+
+---
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: loki-health
+  namespace: monitoring
+  labels:
+    app: health-reporter
+    test-type: http
+    category: infra
+spec:
+  type: http
+  enabled: true
+  severity: high
+  timeout: "10s"
+  interval: "2m"
+  url: "http://loki.monitoring.svc:3100/ready"
+  expectedStatus: 200
+
+---
+apiVersion: health.archipelago.ai/v1alpha1
+kind: SmokeTest
+metadata:
+  name: kargo-health
+  namespace: kargo
+  labels:
+    app: health-reporter
+    test-type: http
+    category: infra
+spec:
+  type: http
+  enabled: true
+  severity: high
+  timeout: "10s"
+  interval: "2m"
+  url: "http://kargo-api.kargo.svc:8080/healthz"
+  expectedStatus: 200

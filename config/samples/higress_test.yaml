@@ -6,6 +6,7 @@ metadata:
   labels:
     app: health-reporter
     test-type: http
+    category: infra
 spec:
   type: http
   enabled: true
