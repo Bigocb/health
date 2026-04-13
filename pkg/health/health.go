@@ -322,11 +322,36 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 		}
 		smokeTestsJSON, _ := json.Marshal(smokeTestsForLLM)
 
-		// Phase 1: Data Analysis - Classify metrics with thresholds + INCLUDE LOG CONTEXT
+		// PHASE 1 STEP 1: Classify metrics server-side (deterministic, not LLM-based)
+		var cpuPercent, memPercent, diskPercent float64
+		if resources, ok := report.ClusterMetrics["resources"].(map[string]interface{}); ok {
+			cpuPercent = floatOrZero(resources["cpu_usage_percent"])
+			memPercent = floatOrZero(resources["memory_usage_percent"])
+			diskPercent = floatOrZero(resources["disk_usage_percent"])
+		}
+
+		classifiedMetrics := analysis.ClassifyMetrics(cpuPercent, memPercent, diskPercent)
+		healthStatus := analysis.DetermineHealthStatus(classifiedMetrics)
+
+		// Format classified metrics for Phase 1 to explain
+		classifiedMetricsText := fmt.Sprintf(`## Server-Side Metric Classifications (Do NOT change these)
+Overall Health: %s
+
+- CPU Usage: %.1f%% [%s]
+- Memory Usage: %.1f%% [%s]
+- Disk Usage: %.1f%% [%s]
+
+Your task: Analyze logs to explain WHY metrics are at these levels.`,
+			healthStatus,
+			classifiedMetrics["cpu"].Value, classifiedMetrics["cpu"].Status,
+			classifiedMetrics["memory"].Value, classifiedMetrics["memory"].Status,
+			classifiedMetrics["disk"].Value, classifiedMetrics["disk"].Status)
+
+		// Phase 1: Log Analysis (LLM analyzes logs to explain classified metrics)
 		dataAnalysisPrompt := r.llmClient.GenerateDataAnalysisPrompt(
-			metricsText,
+			classifiedMetricsText,
 			fmt.Sprintf("%+v", result.Trends),
-			logContext, // NOW PASS LOG CONTEXT TO PHASE 1
+			logContext,
 		)
 
 		log.Printf("LLM Phase 1 - Data Analysis prompt length: %d chars (includes log context)", len(dataAnalysisPrompt))

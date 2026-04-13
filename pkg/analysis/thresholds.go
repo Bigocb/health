@@ -45,3 +45,74 @@ func (rt ResourceThreshold) EvaluateStatus(value float64) string {
 	}
 	return "critical"
 }
+
+// MetricClassification represents a classified metric value
+type MetricClassification struct {
+	Name   string
+	Value  float64
+	Status string
+}
+
+// ClassifyMetrics applies thresholds to metric values and returns classifications
+// This is deterministic and server-side - not dependent on LLM
+func ClassifyMetrics(cpuPercent, memPercent, diskPercent float64) map[string]MetricClassification {
+	thresholds := DefaultThresholds()
+
+	return map[string]MetricClassification{
+		"cpu": {
+			Name:   "CPU Usage",
+			Value:  cpuPercent,
+			Status: thresholds.CPU.EvaluateStatus(cpuPercent),
+		},
+		"memory": {
+			Name:   "Memory Usage",
+			Value:  memPercent,
+			Status: thresholds.Memory.EvaluateStatus(memPercent),
+		},
+		"disk": {
+			Name:   "Disk Usage",
+			Value:  diskPercent,
+			Status: thresholds.Disk.EvaluateStatus(diskPercent),
+		},
+	}
+}
+
+// ClassifyPerNodeMetrics applies thresholds to per-node metrics
+type PerNodeClassification struct {
+	NodeName string
+	CPU      MetricClassification
+	Memory   MetricClassification
+}
+
+func ClassifyPerNodeMetrics(nodeName string, cpuPercent, memPercent float64) PerNodeClassification {
+	thresholds := DefaultThresholds()
+
+	return PerNodeClassification{
+		NodeName: nodeName,
+		CPU: MetricClassification{
+			Name:   "CPU",
+			Value:  cpuPercent,
+			Status: thresholds.CPU.EvaluateStatus(cpuPercent),
+		},
+		Memory: MetricClassification{
+			Name:   "Memory",
+			Value:  memPercent,
+			Status: thresholds.Memory.EvaluateStatus(memPercent),
+		},
+	}
+}
+
+// DetermineHealthStatus determines overall cluster health based on metric statuses
+func DetermineHealthStatus(metrics map[string]MetricClassification) string {
+	for _, metric := range metrics {
+		if metric.Status == "critical" {
+			return "critical"
+		}
+	}
+	for _, metric := range metrics {
+		if metric.Status == "elevated" {
+			return "degraded"
+		}
+	}
+	return "healthy"
+}
