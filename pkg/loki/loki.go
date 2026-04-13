@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -123,6 +122,10 @@ func (c *Client) QueryRange(ctx context.Context, query string, start, end time.T
 
 	// Add Loki org ID header
 	req.Header.Set("X-Scope-OrgID", "admin")
+	// DEBUG: Verify header was set
+	if val := req.Header.Get("X-Scope-OrgID"); val == "" {
+		return nil, fmt.Errorf("CRITICAL: X-Scope-OrgID header not set before request")
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

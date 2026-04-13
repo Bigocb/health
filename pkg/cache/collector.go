@@ -6,6 +6,7 @@ import (
 	"log"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ArchipelagoAI/health-reporter/pkg/loki"
@@ -87,29 +88,62 @@ func (cc *CacheCollector) runCollection(ctx context.Context) {
 
 // collectOnce performs a single collection cycle
 func (cc *CacheCollector) collectOnce(ctx context.Context) {
-	// Set timeout for collection
-	collectionCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	// Set timeout for collection (increased to 90s to handle slow services)
+	collectionCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 
 	log.Printf("[Collector] Starting collection cycle...")
 
-	// Collect metrics
-	metrics, err := cc.collectMetrics(collectionCtx)
-	if err != nil {
-		log.Printf("[Collector] Failed to collect metrics: %v", err)
+	var wg sync.WaitGroup
+	var metrics *EnrichedMetrics
+	var metricsErr error
+	var podErr error
+	var mu sync.Mutex
+
+	// Collect metrics in parallel
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		m, err := cc.collectMetrics(collectionCtx)
+		mu.Lock()
+		if err != nil {
+			metricsErr = err
+		} else {
+			metrics = m
+		}
+		mu.Unlock()
+	}()
+
+	// Collect enriched failed pods in parallel
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		failedPods, err := cc.collectEnrichedFailedPods(collectionCtx, metrics)
+		if err != nil {
+			mu.Lock()
+			podErr = err
+			mu.Unlock()
+		} else if len(failedPods) > 0 {
+			cc.cache.UpdateFailedPods(failedPods)
+		}
+	}()
+
+	// Wait for both to complete
+	wg.Wait()
+
+	// Process results
+	mu.Lock()
+	if metricsErr != nil {
+		log.Printf("[Collector] Failed to collect metrics: %v", metricsErr)
 		cc.cache.stats.CollectionErrors++
 	} else if metrics != nil {
 		cc.cache.UpdateMetrics(*metrics)
 	}
-
-	// Collect enriched failed pods
-	failedPods, err := cc.collectEnrichedFailedPods(collectionCtx, metrics)
-	if err != nil {
-		log.Printf("[Collector] Failed to collect enriched failed pods: %v", err)
+	if podErr != nil {
+		log.Printf("[Collector] Failed to collect enriched failed pods: %v", podErr)
 		cc.cache.stats.CollectionErrors++
-	} else if len(failedPods) > 0 {
-		cc.cache.UpdateFailedPods(failedPods)
 	}
+	mu.Unlock()
 
 	log.Printf("[Collector] Collection cycle complete")
 }
