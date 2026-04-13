@@ -228,58 +228,60 @@ func (l *LLMClient) GenerateDataAnalysisPrompt(metrics string, trends string, lo
 ## Log Context (for root cause analysis)
 %s
 
-## Your Analysis Task: RESEARCH DEEPLY - Correlate Metrics WITH Logs
+## Your Analysis Task: CLASSIFY METRICS FIRST, THEN EXPLAIN WITH LOGS
 
-CRITICAL: You MUST use ALL provided data including logs:
+CRITICAL: Do this in order:
 
-1. **Deep Log Analysis**:
-   - Read ALL provided error logs and patterns carefully
+1. **FIRST: Apply Thresholds to Metrics (Strict Mathematical Classification)**:
+   - Look at each metric value (CPU 26%, Memory 28%, Disk 47%, etc)
+   - Apply ONLY the thresholds provided above
+   - Do NOT let logs influence metric classification
+   - Classify ONLY based on numeric thresholds
+   - Example: If CPU=26%, it is GOOD (26 < 70), period. Logs don't change this.
+
+2. **THEN: Deep Log Analysis (Explains the metrics, doesn't override them)**:
+   - Read error logs to understand WHY metrics are at current levels
    - Identify recurring error messages and failure modes
    - Note which pods/namespaces appear in errors
    - Look for timing patterns (restarts, crashes, timeouts)
-   - Determine if errors are environmental (resource-related) or application-related
+   - Use logs to EXPLAIN metrics (e.g., "CPU is good at 26%, logs show occasional OOMKilled errors on isolated pods")
 
-2. **Per-Node Analysis**: For each node in "Per-Node Metrics", extract:
+3. **Per-Node Analysis**: For each node in "Per-Node Metrics", extract:
    - Node name, Ready status, Schedulable status
    - CPU usage %%, Memory usage %%, Available memory
    - Pod count on that node
    - Apply thresholds to each node's metrics individually
-   - **CHECK LOGS**: Are failed pods concentrated on specific nodes? This indicates NODE problems.
-   - **CHECK LOGS**: Do errors match node resource constraints? This indicates RESOURCE pressure.
+   - **USE LOGS**: Why are errors on this specific node? (resource constraints or app issues?)
 
-3. **Failed Pods Analysis**: Examine each failed pod:
-   - Which namespace and node is it on?
-   - What's the failure reason FROM LOGS?
-   - Is it a CrashLoop (app crash) or Resource issue (OOM/CPU limit)?
-   - Pattern analysis: Are failures concentrated on specific nodes or random?
-   - **CORRELATE**: Do log errors explain the failures?
+4. **Root Cause Correlation**:
+   - Use logs to explain metrics, not to override them
+   - Example: High CPU + Pod crashes in logs = explain why CPU is elevated
+   - Example: Low CPU + OOMKilled in logs = isolated pod issue, not cluster-wide problem
+   - Logs provide context and explanation, but thresholds determine health classification
 
-4. **Root Cause Correlation**: This is CRITICAL:
-   - High CPU + Pod crashes = Resource pressure or CPU-intensive workload
-   - High Memory + Pod evictions = Memory leak or under-provisioning
-   - Failed pods on same node = Node health issue (kernel panic, disk full, etc)
-   - Specific error pattern in logs = Application or configuration problem
-   - Error spikes = Specific events (deployment, traffic surge, dependency failure)
-
-## Your Task: Classify Each Metric Using EXACT THRESHOLDS + Log Evidence
+## Your Task: Classify Each Metric Using EXACT THRESHOLDS (Logs Cannot Override)
 CRITICAL: Apply these EXACT thresholds. Do not deviate. Use ONLY these classifications:
+DO NOT let error logs bias your classification. The numeric threshold is the only classification rule.
 
-**Memory Usage Classification (EXACT):**
-- If value < 75: **good**
+**Memory Usage Classification (EXACT - MANDATORY):**
+- If value < 75: **good** (even if logs show OOMKilled elsewhere)
 - If value >= 75 and < 90: **elevated**
 - If value >= 90: **critical**
 
-**CPU Usage Classification (EXACT):**
-- If value < 70: **good**
+**CPU Usage Classification (EXACT - MANDATORY):**
+- If value < 70: **good** (even if logs show high CPU alerts)
 - If value >= 70 and < 85: **elevated**
 - If value >= 85: **critical**
 
-**Disk Usage Classification (EXACT):**
+**Disk Usage Classification (EXACT - MANDATORY):**
 - If value < 80: **good**
 - If value >= 80 and < 95: **elevated**
 - If value >= 95: **critical**
 
-MANDATORY: You MUST follow these thresholds exactly. If CPU is 26%, you MUST output "good" not "elevated". Do not make your own judgments about severity.
+⚠️ CRITICAL WARNING: Even if logs mention "high CPU" or "memory pressure", IGNORE that for classification.
+Use ONLY the numeric metric value and threshold. Logs are used to explain WHY the metric is at that value.
+Example: CPU metric is 26% → classify as **good** regardless of what logs say. Logs can explain isolated issues.
+Example: If logs say "OOMKilled" but Memory metric is 28%, classify as **good** and note in logs section that errors are isolated.
 
 ## CRITICAL: RESPONSE FORMAT
 Output ONLY plain markdown text. NO JSON, NO OTHER FORMATS.
