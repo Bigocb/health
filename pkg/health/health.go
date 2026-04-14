@@ -181,21 +181,34 @@ func convertCacheToMetrics(cached *cache.EnrichedMetrics) *mimir.Metrics {
 }
 
 func (r *Reporter) Generate(ctx context.Context) (*types.Report, error) {
-	// Read from enriched cache instead of making fresh Mimir queries
-	// Cache is populated by CacheCollector running every 5 minutes
-	if r.cache == nil {
-		return nil, fmt.Errorf("cache not initialized; CacheCollector must be running")
-	}
+	var metrics *mimir.Metrics
 
-	cachedEnriched := r.cache.GetLatestMetrics()
-	if cachedEnriched == nil {
-		return nil, fmt.Errorf("no cached metrics available (CacheCollector may not have completed first cycle)")
+	// Prefer cache (if enabled and available), fallback to direct queries
+	if r.cache != nil {
+		cachedEnriched := r.cache.GetLatestMetrics()
+		if cachedEnriched != nil {
+			// Use cached metrics
+			metrics = convertCacheToMetrics(cachedEnriched)
+			log.Printf("[Report] Generating report from cached metrics (timestamp: %v, cache age: %v)",
+				cachedEnriched.Timestamp, time.Since(cachedEnriched.Timestamp))
+		} else {
+			// Cache not ready yet, fallback to direct query
+			log.Printf("[Report] Cache available but empty, falling back to direct metrics query")
+			var err error
+			metrics, err = r.mimirClient.GetMetrics(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get metrics: %w", err)
+			}
+		}
+	} else {
+		// Cache not initialized, fallback to direct query
+		log.Printf("[Report] Cache not initialized, using direct metrics query")
+		var err error
+		metrics, err = r.mimirClient.GetMetrics(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get metrics: %w", err)
+		}
 	}
-
-	// Convert cache format back to mimir.Metrics format
-	metrics := convertCacheToMetrics(cachedEnriched)
-	log.Printf("[Report] Generating report from cached metrics (timestamp: %v, cache age: %v)",
-		cachedEnriched.Timestamp, time.Since(cachedEnriched.Timestamp))
 
 	report := &types.Report{
 		Timestamp: time.Now().UTC(),
