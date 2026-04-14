@@ -366,7 +366,7 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 				unschedulableStr)
 		}
 
-		// Format classified metrics for Phase 1 to explain
+		// Format classified metrics for Phase 1 to confirm
 		classifiedMetricsText := fmt.Sprintf(`## Server-Side Metric Classifications (Do NOT change these)
 Overall Health: %s
 
@@ -375,9 +375,7 @@ Overall Health: %s
 - Memory Usage: %.1f%% [%s]
 - Disk Usage: %.1f%% [%s]
 
-%s
-
-Your task: Analyze logs to explain WHY metrics are at these levels.`,
+%s`,
 			healthStatus,
 			classifiedMetrics["cpu"].Value, classifiedMetrics["cpu"].Status,
 			classifiedMetrics["memory"].Value, classifiedMetrics["memory"].Status,
