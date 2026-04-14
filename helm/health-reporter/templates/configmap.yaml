@@ -41,7 +41,14 @@ data:
     storage:
       reports_directory: "/var/lib/health-reporter/reports"
       retention_hours: {{ .Values.storage.retentionHours }}
-    
+
+    cache:
+      enabled: {{ .Values.cache.enabled }}
+      collection_interval_seconds: {{ .Values.cache.collectionIntervalSeconds }}
+      max_log_entries: {{ .Values.cache.maxLogEntries }}
+      max_cache_age_hours: {{ .Values.cache.maxCacheAgeHours }}
+      max_memory_mb: {{ .Values.cache.maxMemoryMB }}
+
     analysis:
       enabled: {{ .Values.analysis.enabled }}
       timeout_seconds: {{ .Values.analysis.timeoutSeconds }}

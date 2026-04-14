@@ -98,8 +98,8 @@ rbac:
   create: true
 
 # Node selection
-nodeSelector:
-  kubernetes.io/hostname: internal  # Pin to internal node (131GB available vs vps01's 32GB)
+# TODO: Re-enable nodeSelector once storage is properly configured for node affinity
+nodeSelector: {}
 
 # Tolerations
 tolerations: []
