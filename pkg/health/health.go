@@ -3,7 +3,6 @@ package health
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -414,24 +413,6 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 			}
 		}
 
-		// Prepare smoke tests for LLM (remove severity to avoid confusion)
-		type smokeTestForLLM struct {
-			Name     string `json:"name"`
-			Type     string `json:"type"`
-			Status   string `json:"status"`
-			Message  string `json:"message"`
-			Duration int    `json:"duration_ms"`
-		}
-		var smokeTestsForLLM []smokeTestForLLM
-		for _, st := range report.SmokeTests {
-			smokeTestsForLLM = append(smokeTestsForLLM, smokeTestForLLM{
-				Name:     st.Name,
-				Type:     st.Type,
-				Status:   st.Status,
-				Message:  st.Message,
-				Duration: st.Duration,
-			})
-		}
 		// Format smoke tests nicely for summary (not as JSON)
 		smokeTestsSummary := ""
 		if len(report.SmokeTests) > 0 {
