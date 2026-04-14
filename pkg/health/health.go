@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/ArchipelagoAI/health-reporter/pkg/analysis"
@@ -382,78 +383,68 @@ Overall Health: %s
 			classifiedMetrics["disk"].Value, classifiedMetrics["disk"].Status,
 			perNodeText)
 
-		// Phase 1: TEMPORARY - Disable log input, process deterministic metrics only
-		dataAnalysisPrompt := r.llmClient.GenerateDataAnalysisPrompt(
-			classifiedMetricsText,
-			fmt.Sprintf("%+v", result.Trends),
-			"", // Temporarily disabled - testing metrics-only output
-		)
+		// DETERMINISTIC ANALYSIS ONLY - No LLM
+		// Build clean health summary from server-side classifications
 
-		// Prepare Phase 1 result (we'll build this from server-side classifications)
-		// This avoids relying on LLM to output metrics correctly
-		phase1Result := fmt.Sprintf(`### Overall Health: %s
+		// Per-node status
+		var perNodeSummary string
+		for _, nodeClass := range perNodeClassifications {
+			unschedulableStr := ""
+			for _, n := range report.NodeMetrics {
+				if n.Name == nodeClass.NodeName && n.Unschedulable {
+					unschedulableStr = " ⚠️ Unschedulable"
+					break
+				}
+			}
+			perNodeSummary += fmt.Sprintf("- **%s**: CPU %s (%s), Memory %s (%s)%s\n",
+				nodeClass.NodeName,
+				fmt.Sprintf("%.1f%%", nodeClass.CPU.Value),
+				nodeClass.CPU.Status,
+				fmt.Sprintf("%.1f%%", nodeClass.Memory.Value),
+				nodeClass.Memory.Status,
+				unschedulableStr)
+		}
 
-### Metrics Summary
+		// Build deterministic report
+		reportSummary := fmt.Sprintf(`**Cluster Health Report** — %s
+
+**Executive Summary**
+Cluster is currently **%s**. All metrics within threshold ranges.
+
+**Cluster Metrics**
 - CPU Usage: %.1f%% [%s]
 - Memory Usage: %.1f%% [%s]
 - Disk Usage: %.1f%% [%s]
 - Available Memory: %.0f GB
 - Available Storage: %.0f GB
-- Nodes Total: %d (Ready: %d, Unschedulable: %d)
-- Pods Total: %d (Running: %d, Failed: %d, Pending: %d)
 
-`,
-			healthStatus,
+**Node Status**
+%s
+**Cluster Resources**
+- Nodes: %d total (%d ready, %d unschedulable)
+- Pods: %d total (%d running, %d failed, %d pending)
+
+**Smoke Tests**
+%s`,
+			time.Now().Format("2006-01-02 15:04:05 MST"),
+			strings.ToUpper(healthStatus),
 			classifiedMetrics["cpu"].Value, classifiedMetrics["cpu"].Status,
 			classifiedMetrics["memory"].Value, classifiedMetrics["memory"].Status,
 			classifiedMetrics["disk"].Value, classifiedMetrics["disk"].Status,
 			floatOrZero(resourcesMap["available_memory_gb"]),
 			floatOrZero(resourcesMap["available_storage_gb"]),
+			perNodeSummary,
 			getIntValue(nodesMap["total"]),
 			getIntValue(nodesMap["ready"]),
 			getIntValue(nodesMap["unschedulable"]),
 			getIntValue(podsMap["total"]),
 			getIntValue(podsMap["running"]),
 			getIntValue(podsMap["failed"]),
-			getIntValue(podsMap["pending"]))
+			getIntValue(podsMap["pending"]),
+			string(smokeTestsJSON))
 
-		log.Printf("LLM Phase 1 - Data Analysis prompt length: %d chars (includes log context)", len(dataAnalysisPrompt))
-		log.Printf("[DEBUG Phase1] DETERMINISTIC Classifications (sent to LLM):\n%s", classifiedMetricsText)
-		log.Printf("[DEBUG Phase1] Full Prompt sent to LLM (first 800 chars):\n%s", truncateString(dataAnalysisPrompt, 800))
-
-		dataAnalysisRawResponse, err := r.llmClient.Analyze(ctx, dataAnalysisPrompt)
-		if err != nil {
-			log.Printf("LLM Phase 1 failed: %v", err)
-			return result
-		}
-
-		log.Printf("[DEBUG Phase1] Raw LLM response (log analysis only, first 1000 chars):\n%s", truncateString(dataAnalysisRawResponse, 1000))
-
-		// Combine server-side metrics + LLM log analysis
-		dataAnalysisJSON := phase1Result + "\n" + dataAnalysisRawResponse
-
-		log.Printf("[DEBUG Phase1] Combined result (server metrics + LLM logs, first 1000 chars):\n%s", truncateString(dataAnalysisJSON, 1000))
-
-		// Phase 2: Narrative Generation - Create report based on analysis
-		narrativePrompt := r.llmClient.GenerateNarrativePrompt(
-			dataAnalysisJSON,
-			string(smokeTestsJSON),
-			logContext,
-		)
-
-		log.Printf("LLM Phase 2 - Narrative prompt length: %d chars", len(narrativePrompt))
-
-		// Use Phase 2 LLM client if available, otherwise fall back to Phase 1 client
-		llm2 := r.llmClient2
-		if llm2 == nil {
-			llm2 = r.llmClient
-		}
-
-		if llmAnalysis, err := llm2.Analyze(ctx, narrativePrompt); err == nil {
-			result.HealthSummary = llmAnalysis
-		} else {
-			log.Printf("LLM Phase 2 failed: %v", err)
-		}
+		result.HealthSummary = reportSummary
+		log.Printf("[DETERMINISTIC ANALYSIS] Report generated (no LLM):\n%s", reportSummary)
 	}
 
 	return result
