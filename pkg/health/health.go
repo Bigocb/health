@@ -244,20 +244,20 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 
 	result := r.analyzer.Analyze(ctx, report, historicalReports)
 
-	// Get Loki logs for additional context (from cache if available, else fetch live)
-	var logContext string
-	if r.cache != nil {
-		// Use enriched cache data
-		logContext = r.getLogContextFromCache()
-		log.Printf("[Analyze] Using enriched cache data: %d failed pods, %d error entries",
-			r.cache.GetStats().FailedPodsCount, r.cache.GetStats().TotalErrorEntries)
-	} else if r.lokiClient != nil && r.lokiClient.IsAvailable(ctx) {
-		// Fallback: fetch live data (slower, less enriched)
-		logContext = r.getLogContext(ctx, report)
-		log.Printf("[Analyze] Fetching live log data (cache not available)")
-	}
+	// TODO: Log context for future smart path (LLM root cause analysis)
+	// For now, running deterministic-only path
+	// var logContext string
+	// if r.cache != nil {
+	// 	logContext = r.getLogContextFromCache()
+	// 	log.Printf("[Analyze] Using enriched cache data: %d failed pods, %d error entries",
+	// 		r.cache.GetStats().FailedPodsCount, r.cache.GetStats().TotalErrorEntries)
+	// } else if r.lokiClient != nil && r.lokiClient.IsAvailable(ctx) {
+	// 	logContext = r.getLogContext(ctx, report)
+	// 	log.Printf("[Analyze] Fetching live log data (cache not available)")
+	// }
 
-	if r.llmClient != nil && r.llmClient.IsAvailable(ctx) {
+	// DETERMINISTIC HAPPY PATH - No LLM, no dependencies on log context
+	if true {
 		metricsText := r.formatMetricsAsText(report.ClusterMetrics)
 
 		// Add per-node metrics to analysis
@@ -366,22 +366,6 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 				nodeClass.Memory.Value, nodeClass.Memory.Status,
 				unschedulableStr)
 		}
-
-		// Format classified metrics for Phase 1 to confirm
-		classifiedMetricsText := fmt.Sprintf(`## Server-Side Metric Classifications (Do NOT change these)
-Overall Health: %s
-
-### Cluster Metrics
-- CPU Usage: %.1f%% [%s]
-- Memory Usage: %.1f%% [%s]
-- Disk Usage: %.1f%% [%s]
-
-%s`,
-			healthStatus,
-			classifiedMetrics["cpu"].Value, classifiedMetrics["cpu"].Status,
-			classifiedMetrics["memory"].Value, classifiedMetrics["memory"].Status,
-			classifiedMetrics["disk"].Value, classifiedMetrics["disk"].Status,
-			perNodeText)
 
 		// DETERMINISTIC ANALYSIS ONLY - No LLM
 		// Build clean health summary from server-side classifications
