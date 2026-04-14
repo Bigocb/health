@@ -331,15 +331,16 @@ func (c *Client) queryWithLabels(ctx context.Context, promql string) ([]string, 
 }
 
 // queryPodMetrics queries pod status from Mimir
+// NOTE: Excludes ollama namespace for cleaner health analysis
 func (c *Client) queryPodMetrics(ctx context.Context, m *Metrics) error {
 	queries := map[string]string{
-		"running_pods":   `count(kube_pod_status_phase{phase="Running"})`,
-		"total_pods":     `count(kube_pod_info)`,
-		"pending_pods":   `count(kube_pod_status_phase{phase="Pending"} == 1)`,
-		"failed_pods":    `count(kube_pod_status_phase{phase="Failed"} == 1)`,
-		"succeeded_pods": `count(kube_pod_status_phase{phase="Succeeded"})`,
-		"restarts_1h":    `sum(increase(kube_pod_container_status_restarts_total[1h]))`,
-		"unschedulable":  `count(kube_pod_status_phase{phase="Pending"} and kube_pod_condition{condition="PodScheduled",status="false"})`,
+		"running_pods":   `count(kube_pod_status_phase{namespace!="ollama",phase="Running"})`,
+		"total_pods":     `count(kube_pod_info{namespace!="ollama"})`,
+		"pending_pods":   `count(kube_pod_status_phase{namespace!="ollama",phase="Pending"} == 1)`,
+		"failed_pods":    `count(kube_pod_status_phase{namespace!="ollama",phase="Failed"} == 1)`,
+		"succeeded_pods": `count(kube_pod_status_phase{namespace!="ollama",phase="Succeeded"})`,
+		"restarts_1h":    `sum(increase(kube_pod_container_status_restarts_total{namespace!="ollama"}[1h]))`,
+		"unschedulable":  `count(kube_pod_status_phase{namespace!="ollama",phase="Pending"} and kube_pod_condition{condition="PodScheduled",status="false"})`,
 	}
 
 	results, err := c.queryRange(ctx, queries)
@@ -359,12 +360,13 @@ func (c *Client) queryPodMetrics(ctx context.Context, m *Metrics) error {
 }
 
 // queryDeploymentMetrics queries deployment status from Mimir
+// NOTE: Excludes ollama namespace
 func (c *Client) queryDeploymentMetrics(ctx context.Context, m *Metrics) error {
 	queries := map[string]string{
-		"total_deployments":  `count(kube_deployment_labels)`,
-		"available_replicas": `sum(kube_deployment_status_replicas_available)`,
-		"desired_replicas":   `sum(kube_deployment_spec_replicas)`,
-		"unavailable":        `sum(kube_deployment_status_replicas_unavailable)`,
+		"total_deployments":  `count(kube_deployment_labels{namespace!="ollama"})`,
+		"available_replicas": `sum(kube_deployment_status_replicas_available{namespace!="ollama"})`,
+		"desired_replicas":   `sum(kube_deployment_spec_replicas{namespace!="ollama"})`,
+		"unavailable":        `sum(kube_deployment_status_replicas_unavailable{namespace!="ollama"})`,
 	}
 
 	results, err := c.queryRange(ctx, queries)
@@ -381,12 +383,13 @@ func (c *Client) queryDeploymentMetrics(ctx context.Context, m *Metrics) error {
 }
 
 // queryJobMetrics queries job status from Mimir
+// NOTE: Excludes ollama namespace
 func (c *Client) queryJobMetrics(ctx context.Context, m *Metrics) error {
 	queries := map[string]string{
-		"total_jobs":     `count(kube_job_labels)`,
-		"active_jobs":    `count(kube_job_status_active)`,
-		"failed_jobs":    `count(kube_job_status_failed)`,
-		"succeeded_jobs": `count(kube_job_status_succeeded)`,
+		"total_jobs":     `count(kube_job_labels{namespace!="ollama"})`,
+		"active_jobs":    `count(kube_job_status_active{namespace!="ollama"})`,
+		"failed_jobs":    `count(kube_job_status_failed{namespace!="ollama"})`,
+		"succeeded_jobs": `count(kube_job_status_succeeded{namespace!="ollama"})`,
 	}
 
 	results, err := c.queryRange(ctx, queries)
