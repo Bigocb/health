@@ -429,6 +429,61 @@ Cluster is currently **%s**. All metrics within threshold ranges.
 
 		result.HealthSummary = reportSummary
 		log.Printf("[DETERMINISTIC ANALYSIS] Report generated (no LLM):\n%s", reportSummary)
+
+		// SMART PATH: If status is degraded/critical, invoke LLM for root cause analysis
+		if healthStatus != "healthy" && r.llmClient != nil && r.llmClient.IsAvailable(ctx) {
+			log.Printf("[SMART PATH] Status is %s, analyzing root causes with LLM", healthStatus)
+
+			// Get log context for LLM analysis
+			var logContext string
+			if r.cache != nil {
+				logContext = r.getLogContextFromCache()
+				log.Printf("[SMART PATH] Using enriched cache data")
+			} else if r.lokiClient != nil && r.lokiClient.IsAvailable(ctx) {
+				logContext = r.getLogContext(ctx, report)
+				log.Printf("[SMART PATH] Fetching live log data")
+			}
+
+			// Build root cause analysis prompt
+			rootCausePrompt := fmt.Sprintf(`You are a Kubernetes cluster health analyst. The cluster is currently %s.
+
+## Current Metrics & Status
+%s
+
+## Unschedulable Nodes
+%d node(s) marked unschedulable
+
+## Pod State
+- Running: %d
+- Failed: %d
+- Pending: %d
+
+## Log Context
+%s
+
+## Your Task
+Analyze the logs and metrics to determine:
+1. Why is the cluster degraded? (specific root causes)
+2. Which nodes/pods are affected and why?
+3. What immediate actions should be taken?
+
+Be precise and reference specific logs and metrics.`,
+				strings.ToUpper(healthStatus),
+				reportSummary,
+				getIntValue(nodesMap["unschedulable"]),
+				getIntValue(podsMap["running"]),
+				getIntValue(podsMap["failed"]),
+				getIntValue(podsMap["pending"]),
+				logContext)
+
+			if rootCauseAnalysis, err := r.llmClient.Analyze(ctx, rootCausePrompt); err == nil {
+				// Append root cause analysis to report
+				result.HealthSummary = reportSummary + "\n\n## Root Cause Analysis\n" + rootCauseAnalysis
+				log.Printf("[SMART PATH] Root cause analysis complete")
+			} else {
+				log.Printf("[SMART PATH] LLM root cause analysis failed: %v (using deterministic report only)", err)
+			}
+		}
 	}
 
 	return result
