@@ -93,11 +93,109 @@ func (r *Reporter) SetCacheCollector(collector *cache.CacheCollector) {
 	r.collector = collector
 }
 
-func (r *Reporter) Generate(ctx context.Context) (*types.Report, error) {
-	metrics, err := r.mimirClient.GetMetrics(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get metrics: %w", err)
+// convertCacheToMetrics converts enriched cache format back to mimir.Metrics
+func convertCacheToMetrics(cached *cache.EnrichedMetrics) *mimir.Metrics {
+	metrics := &mimir.Metrics{
+		Nodes:        mimir.NodeMetrics{},
+		Pods:         mimir.PodMetrics{},
+		Resources:    mimir.ResourceMetrics{},
+		Deployments:  mimir.DeploymentMetrics{},
+		Jobs:         mimir.JobMetrics{},
+		Services:     mimir.ServiceMetrics{},
+		Storage:      mimir.StorageMetrics{},
+		NodeDetails:  make([]mimir.NodeDetail, 0),
 	}
+
+	// Extract cluster-level metrics from cache ClusterMetrics map
+	if clusterMetrics, ok := cached.ClusterMetrics["nodes"].(map[string]interface{}); ok {
+		metrics.Nodes.Total = intOrZero(clusterMetrics["total"])
+		metrics.Nodes.Ready = intOrZero(clusterMetrics["ready"])
+		metrics.Nodes.NotReady = intOrZero(clusterMetrics["not_ready"])
+		metrics.Nodes.Unschedulable = intOrZero(clusterMetrics["unschedulable"])
+		metrics.Nodes.CPUCores = intOrZero(clusterMetrics["cpu_cores"])
+		metrics.Nodes.MemoryGB = floatOrZero(clusterMetrics["memory_gb"])
+	}
+
+	if clusterMetrics, ok := cached.ClusterMetrics["pods"].(map[string]interface{}); ok {
+		metrics.Pods.Total = intOrZero(clusterMetrics["total"])
+		metrics.Pods.Running = intOrZero(clusterMetrics["running"])
+		metrics.Pods.Pending = intOrZero(clusterMetrics["pending"])
+		metrics.Pods.Failed = intOrZero(clusterMetrics["failed"])
+		metrics.Pods.Succeeded = intOrZero(clusterMetrics["succeeded"])
+		metrics.Pods.Restarts = intOrZero(clusterMetrics["restarts"])
+		metrics.Pods.Unschedulable = intOrZero(clusterMetrics["unschedulable"])
+	}
+
+	if resourceMetrics, ok := cached.ClusterMetrics["resources"].(map[string]interface{}); ok {
+		metrics.Resources.CPUUsagePercent = floatOrZero(resourceMetrics["cpu_usage_percent"])
+		metrics.Resources.MemoryUsagePercent = floatOrZero(resourceMetrics["memory_usage_percent"])
+		metrics.Resources.DiskUsagePercent = floatOrZero(resourceMetrics["disk_usage_percent"])
+		metrics.Resources.AvailableMemoryGB = floatOrZero(resourceMetrics["available_memory_gb"])
+		metrics.Resources.AvailableStorageGB = floatOrZero(resourceMetrics["available_storage_gb"])
+		metrics.Resources.CPUCoresAllocatable = intOrZero(resourceMetrics["cpu_cores_allocatable"])
+		metrics.Resources.MemoryGBAllocatable = floatOrZero(resourceMetrics["memory_gb_allocatable"])
+	}
+
+	if deployMetrics, ok := cached.ClusterMetrics["deployments"].(map[string]interface{}); ok {
+		metrics.Deployments.Total = intOrZero(deployMetrics["total"])
+		metrics.Deployments.Ready = intOrZero(deployMetrics["ready"])
+		metrics.Deployments.Unready = intOrZero(deployMetrics["unready"])
+		metrics.Deployments.Unavailable = intOrZero(deployMetrics["unavailable"])
+	}
+
+	if jobMetrics, ok := cached.ClusterMetrics["jobs"].(map[string]interface{}); ok {
+		metrics.Jobs.Total = intOrZero(jobMetrics["total"])
+		metrics.Jobs.Active = intOrZero(jobMetrics["active"])
+		metrics.Jobs.Failed = intOrZero(jobMetrics["failed"])
+		metrics.Jobs.Succeeded = intOrZero(jobMetrics["succeeded"])
+	}
+
+	if serviceMetrics, ok := cached.ClusterMetrics["services"].(map[string]interface{}); ok {
+		metrics.Services.Total = intOrZero(serviceMetrics["total"])
+		metrics.Services.ClusterIP = intOrZero(serviceMetrics["cluster_ip"])
+		metrics.Services.Headless = intOrZero(serviceMetrics["headless"])
+		metrics.Services.TypeLoadBalancer = intOrZero(serviceMetrics["loadbalancer"])
+	}
+
+	if storageMetrics, ok := cached.ClusterMetrics["storage"].(map[string]interface{}); ok {
+		metrics.Storage.TotalPVCs = intOrZero(storageMetrics["total_pvcs"])
+		metrics.Storage.BoundPVCs = intOrZero(storageMetrics["bound_pvcs"])
+		metrics.Storage.PendingPVCs = intOrZero(storageMetrics["pending_pvcs"])
+		metrics.Storage.LostPVCs = intOrZero(storageMetrics["lost_pvcs"])
+	}
+
+	// Convert per-node metrics from cache snapshots
+	for _, nodeSnapshot := range cached.NodeMetrics {
+		metrics.NodeDetails = append(metrics.NodeDetails, mimir.NodeDetail{
+			Name:                nodeSnapshot.NodeName,
+			Ready:               nodeSnapshot.Ready,
+			Unschedulable:       nodeSnapshot.Unschedulable,
+			CPUUsagePercent:     nodeSnapshot.CPUUsagePercent,
+			MemoryUsagePercent:  nodeSnapshot.MemoryUsagePercent,
+			AvailableMemoryGB:   nodeSnapshot.AvailableMemoryGB,
+			PodCount:            nodeSnapshot.PodCount,
+		})
+	}
+
+	return metrics
+}
+
+func (r *Reporter) Generate(ctx context.Context) (*types.Report, error) {
+	// Read from enriched cache instead of making fresh Mimir queries
+	// Cache is populated by CacheCollector running every 5 minutes
+	if r.cache == nil {
+		return nil, fmt.Errorf("cache not initialized; CacheCollector must be running")
+	}
+
+	cachedEnriched := r.cache.GetLatestMetrics()
+	if cachedEnriched == nil {
+		return nil, fmt.Errorf("no cached metrics available (CacheCollector may not have completed first cycle)")
+	}
+
+	// Convert cache format back to mimir.Metrics format
+	metrics := convertCacheToMetrics(cachedEnriched)
+	log.Printf("[Report] Generating report from cached metrics (timestamp: %v, cache age: %v)",
+		cachedEnriched.Timestamp, time.Since(cachedEnriched.Timestamp))
 
 	report := &types.Report{
 		Timestamp: time.Now().UTC(),

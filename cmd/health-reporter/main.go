@@ -157,6 +157,9 @@ func main() {
 			time.Duration(cfg.Cache.MaxCacheAgeHours)*time.Hour,
 			int64(cfg.Cache.MaxMemoryMB)*1024*1024,
 		)
+		// Clear cache on startup to ensure fresh state (prevents stale data on pod restart)
+		enrichedCache.Clear()
+		log.Printf("cache cleared on startup (fresh state)")
 		reporter.SetCache(enrichedCache)
 
 		// Create and start background collector

@@ -145,6 +145,22 @@ func (cc *CacheCollector) collectOnce(ctx context.Context) {
 	}
 	mu.Unlock()
 
+	// Log cache statistics for monitoring
+	stats := cc.cache.GetStats()
+	cacheSizeMB := float64(stats.CacheSizeBytes) / 1024 / 1024
+	log.Printf("[Collector] Cache stats: %d pods, %d errors, %.2f MB, %d collection_errors",
+		stats.FailedPodsCount, stats.TotalErrorEntries, cacheSizeMB, stats.CollectionErrors)
+
+	// Warn if cache is approaching memory limit (default 300MB)
+	if stats.CacheSizeBytes > 250*1024*1024 { // 250MB of 300MB limit
+		log.Printf("[Collector] ⚠️ WARNING: Cache approaching limit: %.2f MB", cacheSizeMB)
+	}
+
+	// Warn if too many collection errors
+	if stats.CollectionErrors > 10 {
+		log.Printf("[Collector] ⚠️ WARNING: High number of collection errors: %d", stats.CollectionErrors)
+	}
+
 	log.Printf("[Collector] Collection cycle complete")
 }
 

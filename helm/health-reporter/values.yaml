@@ -53,10 +53,10 @@ storage:
 # Cache configuration (enriched data for async analysis)
 cache:
   enabled: true
-  collectionIntervalSeconds: 60
-  maxLogEntries: 1000           # Max error entries across all pods
-  maxCacheAgeHours: 2           # Keep data for 2 hours
-  maxMemoryMB: 300              # Hard limit on cache size
+  collectionIntervalSeconds: 300  # 5 minutes - steady, predictable collection
+  maxLogEntries: 10000            # Max error entries across all pods
+  maxCacheAgeHours: 1             # Keep data for 1 hour (reduces memory growth)
+  maxMemoryMB: 300                # Hard limit on cache size
 
 # Analysis configuration
 analysis:
@@ -98,7 +98,8 @@ rbac:
   create: true
 
 # Node selection
-nodeSelector: {}
+nodeSelector:
+  node-type: internal  # Pin to internal node (131GB available vs vps01's 32GB)
 
 # Tolerations
 tolerations: []
