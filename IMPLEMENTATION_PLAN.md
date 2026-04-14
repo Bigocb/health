@@ -244,19 +244,14 @@ nodeSelector: {}
 **CHANGE TO:**
 ```yaml
 nodeSelector:
-  node-type: internal
-```
-
-**Verification command:**
-```bash
-kubectl get nodes --show-labels | grep internal
-```
-
-If the label doesn't exist, use hostname instead:
-```yaml
-nodeSelector:
   kubernetes.io/hostname: internal
 ```
+
+**Verification:**
+The internal node uses the standard Kubernetes hostname label. Available nodes:
+- `app01` - SchedulingDisabled
+- `internal` - 131GB available, Ready ✅
+- `vps01` - 32GB, under load
 
 ---
 

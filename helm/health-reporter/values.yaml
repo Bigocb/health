@@ -99,7 +99,7 @@ rbac:
 
 # Node selection
 nodeSelector:
-  node-type: internal  # Pin to internal node (131GB available vs vps01's 32GB)
+  kubernetes.io/hostname: internal  # Pin to internal node (131GB available vs vps01's 32GB)
 
 # Tolerations
 tolerations: []
