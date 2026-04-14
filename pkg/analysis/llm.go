@@ -257,7 +257,7 @@ Then describe the current state:
 ### 2. Current State
 List the key metrics from Phase 1:
 - Cluster-wide CPU, Memory, Disk status
-- Per-node status if any nodes have elevated metrics
+- Per-node status for ALL nodes (include all nodes from Phase 1, even if all [good])
 - Smoke test results
 
 ### 3. Recommendations (if any issues)
