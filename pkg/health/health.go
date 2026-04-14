@@ -132,7 +132,7 @@ func convertCacheToMetrics(cached *cache.EnrichedMetrics) *mimir.Metrics {
 		metrics.Resources.DiskUsagePercent = floatOrZero(resourceMetrics["disk_usage_percent"])
 		metrics.Resources.AvailableMemoryGB = floatOrZero(resourceMetrics["available_memory_gb"])
 		metrics.Resources.AvailableStorageGB = floatOrZero(resourceMetrics["available_storage_gb"])
-		metrics.Resources.CPUCoresAllocatable = intOrZero(resourceMetrics["cpu_cores_allocatable"])
+		metrics.Resources.CPUCoresAllocatable = floatOrZero(resourceMetrics["cpu_cores_allocatable"])
 		metrics.Resources.MemoryGBAllocatable = floatOrZero(resourceMetrics["memory_gb_allocatable"])
 	}
 
