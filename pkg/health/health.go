@@ -432,7 +432,23 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 				Duration: st.Duration,
 			})
 		}
-		smokeTestsJSON, _ := json.Marshal(smokeTestsForLLM)
+		// Format smoke tests nicely for summary (not as JSON)
+		smokeTestsSummary := ""
+		if len(report.SmokeTests) > 0 {
+			passed := 0
+			failed := 0
+			for _, st := range report.SmokeTests {
+				if st.Status == "pass" {
+					passed++
+				} else {
+					failed++
+				}
+			}
+			smokeTestsSummary = fmt.Sprintf("%d passed", passed)
+			if failed > 0 {
+				smokeTestsSummary += fmt.Sprintf(", %d failed", failed)
+			}
+		}
 
 		// PHASE 1 STEP 1: Classify metrics server-side (deterministic, not LLM-based)
 		var cpuPercent, memPercent, diskPercent float64
@@ -536,7 +552,7 @@ Cluster is currently **%s**. All metrics within threshold ranges.
 			getIntValue(podsMap["running"]),
 			getIntValue(podsMap["failed"]),
 			getIntValue(podsMap["pending"]),
-			string(smokeTestsJSON))
+			smokeTestsSummary)
 
 		result.HealthSummary = reportSummary
 		log.Printf("[DETERMINISTIC ANALYSIS] Report generated (no LLM):\n%s", reportSummary)

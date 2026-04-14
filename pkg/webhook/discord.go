@@ -262,7 +262,9 @@ func (d *DiscordSender) formatEmbed(report *types.Report) map[string]interface{}
 
 	// Add analysis section if available (now as additional insights, not main message)
 	if report.Analysis != nil {
-		if confidence, ok := report.Analysis["confidence_score"].(float64); ok && confidence > 0 {
+		// Only show confidence score if there's an LLM analysis (not just trend analysis)
+		// LLM analysis typically has confidence > 0.5; trend analysis has low confidence
+		if confidence, ok := report.Analysis["confidence_score"].(float64); ok && confidence > 0.5 {
 			fields = append(fields, map[string]interface{}{
 				"name":   "Analysis Confidence",
 				"value":  fmt.Sprintf("%.0f%%", confidence*100),
