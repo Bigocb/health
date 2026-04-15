@@ -19,10 +19,15 @@ func GenerateExecutiveSummaryPrompt(report *types.Report) string {
 
 	// Build node status section
 	nodeStatusLines := []string{}
+	nodeReady := 0
+	nodeUnschedulable := 0
 	for _, node := range report.NodeMetrics {
 		status := "Ready"
 		if node.Unschedulable {
 			status = "Unschedulable ⚠️"
+			nodeUnschedulable++
+		} else {
+			nodeReady++
 		}
 		nodeStatusLines = append(nodeStatusLines, fmt.Sprintf(
 			"- %s: CPU %.1f%%, Memory %.1f%%, Disk %.1f%% (%.1f GB available), %d pods, %s",
@@ -36,6 +41,7 @@ func GenerateExecutiveSummaryPrompt(report *types.Report) string {
 		))
 	}
 	nodeStatus := strings.Join(nodeStatusLines, "\n")
+	nodeTotal := len(report.NodeMetrics)
 
 	// Count pod states
 	podResources := clusterMetrics["pods"].(map[string]interface{})
@@ -66,7 +72,7 @@ func GenerateExecutiveSummaryPrompt(report *types.Report) string {
 - Available Memory: %.1f GB
 - Available Storage: %.1f GB
 
-**Node Status**
+**Node Status** (Total: %d, Ready: %d, Unschedulable: %d)
 %s
 
 **Pod Capacity**
@@ -122,6 +128,7 @@ func GenerateExecutiveSummaryPrompt(report *types.Report) string {
 
 Generate the summary now:`,
 		cpuUsage, memUsage, diskUsage, availMem, availStorage,
+		nodeTotal, nodeReady, nodeUnschedulable,
 		nodeStatus,
 		running, pending, failed,
 		passCount, failCount,
