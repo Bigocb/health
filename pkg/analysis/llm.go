@@ -19,6 +19,7 @@ type LLMClient struct {
 	model       string
 	timeout     time.Duration
 	maxRetries  int
+	maxTokens   int
 	httpClient  *http.Client
 	promptCache map[string]string
 }
@@ -44,12 +45,13 @@ type Choice struct {
 	Message Message `json:"message"`
 }
 
-func NewLLMClient(endpoint, model string, timeoutSeconds, maxRetries int) *LLMClient {
+func NewLLMClient(endpoint, model string, timeoutSeconds, maxRetries, maxTokens int) *LLMClient {
 	return &LLMClient{
 		endpoint:    endpoint,
 		model:       model,
 		timeout:     time.Duration(timeoutSeconds) * time.Second,
 		maxRetries:  maxRetries,
+		maxTokens:   maxTokens,
 		httpClient:  &http.Client{Timeout: time.Duration(timeoutSeconds) * time.Second},
 		promptCache: make(map[string]string),
 	}
@@ -84,7 +86,7 @@ func (l *LLMClient) callAPI(ctx context.Context, prompt string) (string, error) 
 		"model":      l.model,
 		"prompt":     fullPrompt,
 		"stream":     false,
-		"max_tokens": 2048,
+		"max_tokens": l.maxTokens,
 		"options": map[string]interface{}{
 			"temperature": 0.2,
 		},
