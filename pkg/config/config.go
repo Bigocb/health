@@ -75,6 +75,7 @@ type LLMConfig struct {
 	Endpoint      string `yaml:"endpoint"`
 	TimeoutSeconds int   `yaml:"timeout_seconds"`
 	MaxRetries    int    `yaml:"max_retries"`
+	MaxTokens     int    `yaml:"max_tokens"`
 }
 
 type OutputConfig struct {
@@ -125,6 +126,9 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	if cfg.Analysis.LLM.MaxRetries == 0 {
 		cfg.Analysis.LLM.MaxRetries = 2
+	}
+	if cfg.Analysis.LLM.MaxTokens == 0 {
+		cfg.Analysis.LLM.MaxTokens = 750
 	}
 
 	// Apply defaults for cache
@@ -185,6 +189,7 @@ func DefaultConfig() *Config {
 				Endpoint:       "http://ollama:11434",
 				TimeoutSeconds: 15,
 				MaxRetries:     2,
+				MaxTokens:      750,
 			},
 			Output: OutputConfig{
 				Format:                 "json",
