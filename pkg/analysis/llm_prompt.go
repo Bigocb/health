@@ -25,10 +25,11 @@ func GenerateExecutiveSummaryPrompt(report *types.Report) string {
 			status = "Unschedulable ⚠️"
 		}
 		nodeStatusLines = append(nodeStatusLines, fmt.Sprintf(
-			"- %s: CPU %.1f%%, Memory %.1f%%, Disk available %.1f GB, %d pods, %s",
+			"- %s: CPU %.1f%%, Memory %.1f%%, Disk %.1f%% (%.1f GB available), %d pods, %s",
 			node.Name,
 			node.CPUUsagePercent,
 			node.MemoryUsagePercent,
+			node.DiskUsagePercent,
 			node.AvailableDiskGB,
 			node.PodCount,
 			status,

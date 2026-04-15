@@ -571,13 +571,20 @@ Cluster is currently **%s**. All metrics within threshold ranges.
 
 		result.HealthSummary = reportSummary
 
-		// Preserve any LLM analysis that was already appended to report.Summary in Generate()
+		// Replace executive summary with LLM analysis if available
 		if strings.Contains(report.Summary, "## LLM Analysis:") {
-			// Extract and append the LLM analysis section to the result summary
 			parts := strings.SplitN(report.Summary, "## LLM Analysis:", 2)
 			if len(parts) == 2 {
-				result.HealthSummary = reportSummary + "\n\n## LLM Analysis:" + parts[1]
-				log.Printf("[DETERMINISTIC ANALYSIS + LLM] Report with LLM analysis appended")
+				llmAnalysis := strings.TrimSpace(parts[1])
+				// Replace the executive summary paragraph with LLM analysis
+				// Keep the header format: "**Executive Summary**\n"
+				result.HealthSummary = strings.Replace(
+					reportSummary,
+					"**Executive Summary**\nCluster is currently **"+strings.ToUpper(healthStatus)+"**. All metrics within threshold ranges.",
+					"**Executive Summary**\n"+llmAnalysis,
+					1,
+				)
+				log.Printf("[DETERMINISTIC ANALYSIS + LLM] Executive summary replaced with LLM analysis")
 			}
 		} else {
 			log.Printf("[DETERMINISTIC ANALYSIS] Report generated (no LLM):\n%s", reportSummary)
