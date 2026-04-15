@@ -341,22 +341,12 @@ func (r *Reporter) Generate(ctx context.Context) (*types.Report, error) {
 		}
 	}
 
-	// Always invoke LLM for executive summary (different prompts based on status)
-	if r.llmClient != nil {
-		var llmPrompt string
-		var llmTimeout time.Duration
-
-		if report.Status == types.StatusHealthy {
-			// Happy Path: Brief executive summary
-			llmPrompt = analysis.GenerateExecutiveSummaryPrompt(report)
-			llmTimeout = time.Duration(120) * time.Second // 2 minutes for simple summary
-			log.Printf("[Report] Happy Path: Invoking LLM for executive summary (brief)")
-		} else {
-			// Smart Path: Detailed root cause analysis
-			llmPrompt = analysis.GenerateExecutiveSummaryPrompt(report) // TODO: Create GenerateRootCauseAnalysisPrompt() later
-			llmTimeout = time.Duration(360) * time.Second              // 6 minutes for detailed analysis
-			log.Printf("[Report] Smart Path: Invoking LLM for root cause analysis (status: %s)", report.Status)
-		}
+	// Invoke LLM only for degraded/critical clusters (not on happy path)
+	if r.llmClient != nil && report.Status != types.StatusHealthy {
+		// Smart Path: Detailed root cause analysis
+		llmPrompt := analysis.GenerateExecutiveSummaryPrompt(report) // TODO: Create GenerateRootCauseAnalysisPrompt() later
+		llmTimeout := time.Duration(360) * time.Second               // 6 minutes for detailed analysis
+		log.Printf("[Report] Smart Path: Invoking LLM for root cause analysis (status: %s)", report.Status)
 
 		// Create a context with timeout for LLM calls
 		llmCtx, cancel := context.WithTimeout(ctx, llmTimeout)
