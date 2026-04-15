@@ -21,7 +21,9 @@ type NodeMetrics struct {
 	Unschedulable      bool    `json:"unschedulable"`
 	CPUUsagePercent    float64 `json:"cpu_usage_percent"`
 	MemoryUsagePercent float64 `json:"memory_usage_percent"`
+	DiskUsagePercent   float64 `json:"disk_usage_percent"`
 	AvailableMemoryGB  float64 `json:"available_memory_gb"`
+	AvailableDiskGB    float64 `json:"available_disk_gb"`
 	PodCount           int     `json:"pod_count"`
 }
 

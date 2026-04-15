@@ -37,7 +37,9 @@ type NodeDetail struct {
 	Unschedulable      bool
 	CPUUsagePercent    float64
 	MemoryUsagePercent float64
+	DiskUsagePercent   float64
 	AvailableMemoryGB  float64
+	AvailableDiskGB    float64
 	PodCount           int
 }
 
@@ -246,6 +248,17 @@ func (c *Client) queryNodeDetailsMetrics(ctx context.Context, m *Metrics) error 
 			detail.AvailableMemoryGB = memAvail
 		}
 
+		// Query per-node disk metrics (root filesystem)
+		diskQuery := fmt.Sprintf(`round(100*(1-node_filesystem_avail_bytes{instance=~"%s.*",fstype!~"tmpfs|fuse.lxcfs|squashfs",mountpoint="/"}/node_filesystem_size_bytes{instance=~"%s.*",fstype!~"tmpfs|fuse.lxcfs|squashfs",mountpoint="/"}),1)`, node, node)
+		if disk, err := c.query(ctx, diskQuery); err == nil && disk >= 0 {
+			detail.DiskUsagePercent = disk
+		}
+
+		diskAvailQuery := fmt.Sprintf(`round(node_filesystem_avail_bytes{instance=~"%s.*",fstype!~"tmpfs|fuse.lxcfs|squashfs",mountpoint="/"}/1024/1024/1024,1)`, node)
+		if diskAvail, err := c.query(ctx, diskAvailQuery); err == nil && diskAvail >= 0 {
+			detail.AvailableDiskGB = diskAvail
+		}
+
 		// Check if node is ready and schedulable
 		readyQuery := fmt.Sprintf(`kube_node_status_condition{node="%s",condition="Ready",status="true"}`, node)
 		if ready, err := c.query(ctx, readyQuery); err == nil && ready > 0 {
@@ -263,8 +276,8 @@ func (c *Client) queryNodeDetailsMetrics(ctx context.Context, m *Metrics) error 
 			detail.PodCount = int(podCount)
 		}
 
-		fmt.Printf("[DEBUG] Node %s: CPU=%.1f%%, Mem=%.1f%%, MemAvail=%.1fGB, Ready=%v, Unschedulable=%v, Pods=%d\n",
-			detail.Name, detail.CPUUsagePercent, detail.MemoryUsagePercent, detail.AvailableMemoryGB,
+		fmt.Printf("[DEBUG] Node %s: CPU=%.1f%%, Mem=%.1f%%, Disk=%.1f%%, MemAvail=%.1fGB, DiskAvail=%.1fGB, Ready=%v, Unschedulable=%v, Pods=%d\n",
+			detail.Name, detail.CPUUsagePercent, detail.MemoryUsagePercent, detail.DiskUsagePercent, detail.AvailableMemoryGB, detail.AvailableDiskGB,
 			detail.Ready, detail.Unschedulable, detail.PodCount)
 
 		m.NodeDetails = append(m.NodeDetails, detail)

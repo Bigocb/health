@@ -295,7 +295,9 @@ func (r *Reporter) Generate(ctx context.Context) (*types.Report, error) {
 				Unschedulable:      detail.Unschedulable,
 				CPUUsagePercent:    detail.CPUUsagePercent,
 				MemoryUsagePercent: detail.MemoryUsagePercent,
+				DiskUsagePercent:   detail.DiskUsagePercent,
 				AvailableMemoryGB:  detail.AvailableMemoryGB,
+				AvailableDiskGB:    detail.AvailableDiskGB,
 				PodCount:           detail.PodCount,
 			})
 		}
@@ -334,6 +336,11 @@ func (r *Reporter) Generate(ctx context.Context) (*types.Report, error) {
 			_ = fmt.Errorf("failed to cleanup old reports: %v", err)
 		}
 	}
+
+	// Generate executive summary LLM prompt for potential analysis
+	// (Currently just logging - will be used for actual LLM calls later)
+	executiveSummaryPrompt := analysis.GenerateExecutiveSummaryPrompt(report)
+	log.Printf("[PROMPT] Generated executive summary LLM prompt:\n%s\n", executiveSummaryPrompt)
 
 	return report, nil
 }
