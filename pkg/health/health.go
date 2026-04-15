@@ -570,7 +570,18 @@ Cluster is currently **%s**. All metrics within threshold ranges.
 			smokeTestsSummary)
 
 		result.HealthSummary = reportSummary
-		log.Printf("[DETERMINISTIC ANALYSIS] Report generated (no LLM):\n%s", reportSummary)
+
+		// Preserve any LLM analysis that was already appended to report.Summary in Generate()
+		if strings.Contains(report.Summary, "## LLM Analysis:") {
+			// Extract and append the LLM analysis section to the result summary
+			parts := strings.SplitN(report.Summary, "## LLM Analysis:", 2)
+			if len(parts) == 2 {
+				result.HealthSummary = reportSummary + "\n\n## LLM Analysis:" + parts[1]
+				log.Printf("[DETERMINISTIC ANALYSIS + LLM] Report with LLM analysis appended")
+			}
+		} else {
+			log.Printf("[DETERMINISTIC ANALYSIS] Report generated (no LLM):\n%s", reportSummary)
+		}
 
 		// SMART PATH: If status is degraded/critical, invoke LLM for root cause analysis
 		if healthStatus != "healthy" && r.llmClient != nil && r.llmClient.IsAvailable(ctx) {
