@@ -5,6 +5,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/ArchipelagoAI/health-reporter/pkg/smoke_tests"
 )
 
 // EnrichedCache stores enriched metrics and log data with automatic eviction
@@ -12,9 +14,11 @@ type EnrichedCache struct {
 	mu sync.RWMutex
 
 	// Storage
-	failedPods  map[string]*EnrichedFailedPod    // key: namespace/pod-name
-	metrics     []EnrichedMetrics                // time-series metrics
-	nodeMetrics map[string][]NodeMetricsSnapshot // key: node-name, time-series
+	failedPods           map[string]*EnrichedFailedPod    // key: namespace/pod-name
+	metrics              []EnrichedMetrics                // time-series metrics
+	nodeMetrics          map[string][]NodeMetricsSnapshot // key: node-name, time-series
+	lastSmokeTestResults []*smoke_tests.TestResult        // cached smoke test results
+	lastSmokeTestTime    time.Time                        // timestamp of last smoke test run
 
 	// Configuration
 	maxLogEntries  int           // max error entries across all pods
@@ -266,6 +270,25 @@ func (c *EnrichedCache) estimateSize() int64 {
 	return size
 }
 
+// UpdateSmokeTestResults stores cached smoke test results with timestamp
+func (c *EnrichedCache) UpdateSmokeTestResults(results []*smoke_tests.TestResult) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.lastSmokeTestResults = results
+	c.lastSmokeTestTime = time.Now()
+
+	log.Printf("[Cache] Updated smoke test results: %d tests", len(results))
+}
+
+// GetLatestSmokeTestResults returns the most recent cached smoke test results
+func (c *EnrichedCache) GetLatestSmokeTestResults() []*smoke_tests.TestResult {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.lastSmokeTestResults
+}
+
 // Clear empties the cache
 func (c *EnrichedCache) Clear() {
 	c.mu.Lock()
@@ -274,6 +297,8 @@ func (c *EnrichedCache) Clear() {
 	c.failedPods = make(map[string]*EnrichedFailedPod)
 	c.metrics = make([]EnrichedMetrics, 0)
 	c.nodeMetrics = make(map[string][]NodeMetricsSnapshot)
+	c.lastSmokeTestResults = nil
+	c.lastSmokeTestTime = time.Time{}
 	c.updateStats()
 	log.Printf("[Cache] Cleared")
 }

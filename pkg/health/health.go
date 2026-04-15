@@ -308,17 +308,21 @@ func (r *Reporter) Generate(ctx context.Context) (*types.Report, error) {
 		report.FailedPods = r.getFailedPodsList(ctx)
 	}
 
-	if r.testRegistry != nil {
-		smokeTestResults := r.testRegistry.RunAllTests(ctx)
-		for _, result := range smokeTestResults {
-			report.SmokeTests = append(report.SmokeTests, types.SmokeTestResult{
-				Name:     result.Name,
-				Type:     result.Type,
-				Status:   result.Status,
-				Message:  result.Message,
-				Duration: int(result.Duration.Milliseconds()),
-				Severity: result.Severity,
-			})
+	// Fetch cached smoke test results (tests run async in background collector)
+	if r.cache != nil {
+		smokeTestResults := r.cache.GetLatestSmokeTestResults()
+		if smokeTestResults != nil {
+			for _, result := range smokeTestResults {
+				report.SmokeTests = append(report.SmokeTests, types.SmokeTestResult{
+					Name:     result.Name,
+					Type:     result.Type,
+					Status:   result.Status,
+					Message:  result.Message,
+					Duration: int(result.Duration.Milliseconds()),
+					Severity: result.Severity,
+				})
+			}
+			log.Printf("[Report] Using cached smoke test results: %d tests", len(smokeTestResults))
 		}
 	}
 

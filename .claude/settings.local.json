@@ -78,7 +78,8 @@
       "Bash(kubectl run:*)",
       "Bash(grep -n \"SendReportWithAnalysis\\\\|HealthSummary\" pkg/health/*.go)",
       "Read(//c/tmp/**)",
-      "Bash(rm -f health-reporter)"
+      "Bash(rm -f health-reporter)",
+      "Bash(kubectl api-resources:*)"
     ]
   }
 }

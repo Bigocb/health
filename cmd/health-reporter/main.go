@@ -178,6 +178,11 @@ func main() {
 		log.Printf("cache enabled: max %d log entries, %d hour retention, %d MB limit",
 			cfg.Cache.MaxLogEntries, cfg.Cache.MaxCacheAgeHours, cfg.Cache.MaxMemoryMB)
 		log.Printf("background collector started (interval: %ds)", cfg.Cache.CollectionIntervalSeconds)
+
+		// Start smoke test collector (runs tests async every 30 minutes with independent timeout)
+		smokeTestCollector := cache.NewSmokeTestCollector(testRegistry, enrichedCache)
+		go smokeTestCollector.Start(ctx)
+		log.Printf("smoke test collector started (interval: 30m, timeout: 90s)")
 	}
 
 	sigChan := make(chan os.Signal, 1)
