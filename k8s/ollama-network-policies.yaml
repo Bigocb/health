@@ -1,0 +1,91 @@
+---
+# NetworkPolicy: Deny all egress from Ollama namespace by default
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ollama-deny-external-egress
+  namespace: ollama
+spec:
+  podSelector: {}  # Apply to all pods in ollama namespace
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS queries to cluster DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow traffic within the cluster (same namespace and monitoring)
+    - to:
+        - podSelector: {}  # Pods in same namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+    # Allow Kubernetes API server (needed for some operations)
+    - to:
+        - podSelector: {}
+          namespaceSelector:
+            matchLabels:
+              name: kube-apiserver
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+# NetworkPolicy: Deny all ingress to Ollama except from monitoring namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ollama-deny-external-ingress
+  namespace: ollama
+spec:
+  podSelector: {}  # Apply to all pods in ollama namespace
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from monitoring namespace (health-reporter)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 11434
+    # Allow from ollama namespace itself (inter-pod communication)
+    - from:
+        - podSelector: {}
+          namespaceSelector:
+            matchLabels:
+              name: ollama
+      ports:
+        - protocol: TCP
+          port: 11434
+
+---
+# Supplementary: Restrict DNS queries to internal resolution only
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ollama-restrict-dns
+  namespace: ollama
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # Only allow DNS to cluster DNS service (not external resolvers)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

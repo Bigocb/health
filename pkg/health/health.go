@@ -337,18 +337,28 @@ func (r *Reporter) Generate(ctx context.Context) (*types.Report, error) {
 		}
 	}
 
-	// Smart Path: Call LLM only if cluster is degraded/critical (not for happy path)
-	// This reduces latency for healthy clusters and only uses LLM when needed
-	if report.Status != types.StatusHealthy && r.llmClient != nil {
-		log.Printf("[Report] Cluster status is %s, invoking LLM for root cause analysis", report.Status)
+	// Always invoke LLM for executive summary (different prompts based on status)
+	if r.llmClient != nil {
+		var llmPrompt string
+		var llmTimeout time.Duration
 
-		executiveSummaryPrompt := analysis.GenerateExecutiveSummaryPrompt(report)
+		if report.Status == types.StatusHealthy {
+			// Happy Path: Brief executive summary
+			llmPrompt = analysis.GenerateExecutiveSummaryPrompt(report)
+			llmTimeout = time.Duration(120) * time.Second // 2 minutes for simple summary
+			log.Printf("[Report] Happy Path: Invoking LLM for executive summary (brief)")
+		} else {
+			// Smart Path: Detailed root cause analysis
+			llmPrompt = analysis.GenerateExecutiveSummaryPrompt(report) // TODO: Create GenerateRootCauseAnalysisPrompt() later
+			llmTimeout = time.Duration(360) * time.Second              // 6 minutes for detailed analysis
+			log.Printf("[Report] Smart Path: Invoking LLM for root cause analysis (status: %s)", report.Status)
+		}
 
 		// Create a context with timeout for LLM calls
-		llmCtx, cancel := context.WithTimeout(ctx, time.Duration(360)*time.Second) // 6 minutes
+		llmCtx, cancel := context.WithTimeout(ctx, llmTimeout)
 		defer cancel()
 
-		llmResponse, err := r.llmClient.Analyze(llmCtx, executiveSummaryPrompt)
+		llmResponse, err := r.llmClient.Analyze(llmCtx, llmPrompt)
 		if err != nil {
 			log.Printf("[Report] LLM analysis failed (non-blocking): %v", err)
 			// Don't fail the entire report generation, just skip LLM analysis
@@ -357,8 +367,6 @@ func (r *Reporter) Generate(ctx context.Context) (*types.Report, error) {
 			report.Summary = fmt.Sprintf("%s\n\n## LLM Analysis:\n%s", report.Summary, llmResponse)
 			log.Printf("[Report] Added LLM analysis to report (length: %d chars)", len(llmResponse))
 		}
-	} else if report.Status == types.StatusHealthy {
-		log.Printf("[Report] Happy Path: Cluster is healthy, skipping LLM inference")
 	}
 
 	return report, nil
