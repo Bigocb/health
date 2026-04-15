@@ -68,14 +68,15 @@ type TrendsConfig struct {
 }
 
 type LLMConfig struct {
-	Enabled       bool   `yaml:"enabled"`
-	Provider      string `yaml:"provider"` // "ollama", "openai", "anthropic"
-	Model         string `yaml:"model"`
-	Phase2Model   string `yaml:"phase2_model"` // Optional: different model for Phase 2 narrative
-	Endpoint      string `yaml:"endpoint"`
-	TimeoutSeconds int   `yaml:"timeout_seconds"`
+	Enabled       bool    `yaml:"enabled"`
+	Provider      string  `yaml:"provider"` // "ollama", "openai", "anthropic"
+	Model         string  `yaml:"model"`
+	Phase2Model   string  `yaml:"phase2_model"` // Optional: different model for Phase 2 narrative
+	Endpoint      string  `yaml:"endpoint"`
+	TimeoutSeconds int    `yaml:"timeout_seconds"`
 	MaxRetries    int    `yaml:"max_retries"`
 	MaxTokens     int    `yaml:"max_tokens"`
+	Temperature   float32 `yaml:"temperature"`
 }
 
 type OutputConfig struct {
@@ -129,6 +130,9 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	if cfg.Analysis.LLM.MaxTokens == 0 {
 		cfg.Analysis.LLM.MaxTokens = 750
+	}
+	if cfg.Analysis.LLM.Temperature == 0 {
+		cfg.Analysis.LLM.Temperature = 0.05
 	}
 
 	// Apply defaults for cache
@@ -190,6 +194,7 @@ func DefaultConfig() *Config {
 				TimeoutSeconds: 15,
 				MaxRetries:     2,
 				MaxTokens:      750,
+				Temperature:    0.05,
 			},
 			Output: OutputConfig{
 				Format:                 "json",

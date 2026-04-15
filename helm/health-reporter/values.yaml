@@ -73,7 +73,7 @@ analysis:
     endpoint: "http://ollama.ollama.svc.cluster.local:11434"
     timeoutSeconds: 360  # 6 minutes for Ollama inference
     maxRetries: 1
-    temperature: 0.2
+    temperature: 0.05  # Very low temp for deterministic, no-filler output
     maxTokens: 750  # ~300-350 words (1 token ≈ 0.75 words), enforces concise summaries
     # phase2Model: will add larger model later for root cause analysis when degraded
 

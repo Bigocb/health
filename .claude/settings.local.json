@@ -72,7 +72,13 @@
       "Bash(python3 -m json.tool)",
       "Bash(kubectl port-forward:*)",
       "Bash(python3 -c \"import sys, json; d = json.load\\(sys.stdin\\); print\\('✅ Ollama working! Response:', d['response'][:100]\\)\")",
-      "Bash(pkill -f \"port-forward\")"
+      "Bash(pkill -f \"port-forward\")",
+      "WebFetch(domain:github.com)",
+      "Bash(curl -s https://api.github.com/repos/Bigocb/health/actions/runs?branch=main)",
+      "Bash(kubectl run:*)",
+      "Bash(grep -n \"SendReportWithAnalysis\\\\|HealthSummary\" pkg/health/*.go)",
+      "Read(//c/tmp/**)",
+      "Bash(rm -f health-reporter)"
     ]
   }
 }
