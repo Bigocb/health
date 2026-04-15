@@ -535,6 +535,19 @@ func (r *Reporter) Analyze(ctx context.Context, report *types.Report) *analysis.
 				unschedulableStr)
 		}
 
+		// Calculate actual node counts from report.NodeMetrics (not from cluster metrics)
+		// This ensures consistency with the per-node summaries
+		nodeTotal := len(report.NodeMetrics)
+		nodeReady := 0
+		nodeUnschedulable := 0
+		for _, node := range report.NodeMetrics {
+			if node.Unschedulable {
+				nodeUnschedulable++
+			} else {
+				nodeReady++
+			}
+		}
+
 		// Build deterministic report
 		reportSummary := fmt.Sprintf(`**Cluster Health Report** — %s
 
@@ -564,9 +577,9 @@ Cluster is currently **%s**. All metrics within threshold ranges.
 			floatOrZero(resourcesMap["available_memory_gb"]),
 			floatOrZero(resourcesMap["available_storage_gb"]),
 			perNodeSummary,
-			getIntValue(nodesMap["total"]),
-			getIntValue(nodesMap["ready"]),
-			getIntValue(nodesMap["unschedulable"]),
+			nodeTotal,
+			nodeReady,
+			nodeUnschedulable,
 			getIntValue(podsMap["total"]),
 			getIntValue(podsMap["running"]),
 			getIntValue(podsMap["failed"]),
