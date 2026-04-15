@@ -87,30 +87,34 @@ func GenerateExecutiveSummaryPrompt(report *types.Report) string {
 
 **CRITICAL RULES - Follow exactly:**
 
-1. START with ONE sentence stating overall status: "The cluster is HEALTHY." or "The cluster is DEGRADED:" or "The cluster is CRITICAL:"
+1. START with ONE sentence stating overall status and key metrics: "The cluster is HEALTHY with X% CPU, Y% memory, Z% disk usage."
 
-2. IF HEALTHY with no issues: State this in 1-2 sentences and stop. Do not add filler.
-   Example: "The cluster is HEALTHY with all metrics well below thresholds. No immediate action required."
+2. Briefly describe cluster state (2-3 sentences max):
+   - Overall capacity/readiness
+   - Available resources (memory GB, storage GB)
+   - Trend summary (stable, no restarts, minimal churn)
 
-3. IF there are constraints/risks, structure as:
-   - **Issue**: [Specific node/metric name and exact numbers]
-   - **Impact**: [What this means for operations]
-   - **Recommendation**: [Specific action, not generic advice]
+3. **CALL OUT CONSTRAINTS** - Use the provided node data:
+   - List any UNSCHEDULABLE nodes with reason (e.g., "app01: Unschedulable")
+   - List any nodes with HIGH resource usage (CPU >70%, Memory >75%, Disk >75%)
+   - Format: "- node_name: status (specific metric)")
+   - If NO constraints, state: "No resource constraints detected."
 
 4. **FORBIDDEN (NEVER include):**
    - Generic statements like "monitor the cluster closely"
    - Redundant observations (e.g., "Memory is stable and CPU is stable")
-   - Mentions of "no restarts" as if it's a problem or constraint
-   - Vague phrases like "node capacity is limited" without specifics
-   - Contradictory statements about cluster health
-   - Filler words or paragraphs that don't add information
+   - Mentions of "no restarts" as problem statements
+   - Vague phrases without specifics
+   - Filler words or padding
+   - Contradictory statements
 
 5. **REQUIRED:**
-   - Maximum 300 words absolute limit
-   - Every statement must have a specific reason for being there
+   - Target: 450-550 words/chars
    - Reference actual node names (vps01, app01, internal, etc.)
-   - Quantify impact: "X nodes constrained, affects Y% of capacity"
-   - If no action needed, explicitly say: "No remediation required at this time."
+   - Use exact numbers from provided metrics
+   - If all metrics healthy: brief summary + constraint list
+   - If any constraints: identify them clearly
+   - No recommendations unless actually needed
 
 6. Output ONLY the summary text. No markdown headers, no "Executive Summary:" prefix.
 
