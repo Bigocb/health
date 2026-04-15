@@ -74,7 +74,7 @@ analysis:
     timeoutSeconds: 360  # 6 minutes for Ollama inference
     maxRetries: 1
     temperature: 0.2
-    maxTokens: 2048
+    maxTokens: 750  # ~300-350 words (1 token ≈ 0.75 words), enforces concise summaries
     # phase2Model: will add larger model later for root cause analysis when degraded
 
 # Resource limits for the single deployment

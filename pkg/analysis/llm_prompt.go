@@ -84,22 +84,22 @@ func GenerateExecutiveSummaryPrompt(report *types.Report) string {
 
 ## Your Task
 
-Write a professional 1-2 paragraph executive summary addressing:
+Write a concise executive summary (aim for ~300 words, maximum 350) addressing:
 1. Overall cluster health status
-2. Key constraints or risks
-3. Recommended actions
+2. Key constraints or risks (if any)
+3. Recommended actions (if any)
 
 **Requirements:**
-- Maximum 500 words (target: 200 words)
-- Professional tone
+- STRICT: Keep to 300-350 words maximum
+- Professional tone, concise language
 - Specific component names (not vague)
-- Confidence level noted where data is inconclusive
 - Lead with clear status: HEALTHY / DEGRADED / CRITICAL
 - Base recommendations only on metrics shown
 - Do not recommend pod eviction without understanding root cause
 - If no immediate remediation is needed, state that clearly
 - Quantify fault tolerance impact if a node is constrained
 - If the root cause is disk-based, include specific cleanup recommendations
+- Use bullet points for clarity, not long paragraphs
 
 ---
 
